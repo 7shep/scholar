@@ -1,0 +1,28 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: 220 24% 8%;
+    --foreground: 220 20% 97%;
+  }
+
+  * {
+    @apply border-slate-700;
+  }
+
+  body {
+    @apply m-0 min-h-screen bg-slate-950 text-slate-50 antialiased;
+    background-image:
+      radial-gradient(circle at top, rgba(59, 130, 246, 0.12), transparent 36%),
+      linear-gradient(180deg, #050816 0%, #0f172a 55%, #020617 100%);
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+}
