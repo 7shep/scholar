@@ -3,6 +3,7 @@ import path from 'node:path';
 
 function createWindow(): void {
   const win = new BrowserWindow({
+    autoHideMenuBar: true,
     width: 1280,
     height: 800,
     backgroundColor: '#0f172a',
@@ -12,6 +13,7 @@ function createWindow(): void {
       nodeIntegration: false,
     },
   });
+  win.setMenuBarVisibility(false);
 
   const devServerUrl = process.env.VITE_DEV_SERVER_URL;
 
