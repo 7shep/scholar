@@ -6,7 +6,7 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
+    color-scheme: dark light;
     --background: 220 24% 8%;
     --foreground: 220 20% 97%;
   }
@@ -24,5 +24,38 @@
 
   #root {
     @apply min-h-screen;
+  }
+}
+
+@layer utilities {
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes progress-grow {
+    from {
+      transform: scaleX(0);
+    }
+
+    to {
+      transform: scaleX(1);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 520ms ease-out both;
+  }
+
+  .animate-progress-grow {
+    animation: progress-grow 900ms ease-out both;
+    transform-origin: left center;
   }
 }

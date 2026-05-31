@@ -8,7 +8,7 @@
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:renderer": "vite build",
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\" \"npm:dev:app\"",
-    "dev:app": "wait-on tcp:5173 file:dist/electron/main.js && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "dev:app": "wait-on tcp:5173 file:dist/electron/main.js && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 node scripts/dev-electron.mjs",
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput",
     "dev:renderer": "vite",
     "start": "npm run build && electron ."

@@ -68,9 +68,15 @@ function AppContent() {
   }
 
   if (user) {
+    const fullName =
+      typeof user.user_metadata?.full_name === "string"
+        ? user.user_metadata.full_name
+        : undefined;
+
     return (
       <HomePage
         email={user.email}
+        fullName={fullName}
         isSigningOut={isSigningOut}
         onSignOut={handleSignOut}
       />

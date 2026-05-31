@@ -13,6 +13,7 @@ export default {
         glow: "0 30px 80px rgba(15, 23, 42, 0.45)",
       },
       fontFamily: {
+        display: ["'Plus Jakarta Sans'", "system-ui", "sans-serif"],
         sans: ["'Plus Jakarta Sans'", "system-ui", "sans-serif"],
       },
     },
