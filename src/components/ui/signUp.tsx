@@ -150,22 +150,6 @@ export function SignUp({
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
 
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-transparent px-3 text-xs uppercase tracking-[0.25em] text-slate-400">
-              Or continue with
-            </span>
-          </div>
-        </div>
-
-        <button className="flex items-center justify-center gap-3 rounded-full border border-white/10 bg-slate-900/70 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-          <Chrome className="h-5 w-5 text-cyan-200" />
-          Google
-        </button>
-
         <p className="text-center text-xs text-slate-400">
           Already have an account?{" "}
           <button

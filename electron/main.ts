@@ -1,6 +1,9 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'node:path';
 import { loadWindowState, saveWindowState } from './window-state';
+
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow(): void {
   const windowState = loadWindowState();
@@ -20,6 +23,7 @@ function createWindow(): void {
     },
   });
   win.setMenuBarVisibility(false);
+  mainWindow = win;
 
   const persistWindowState = (): void => {
     if (win.isMinimized()) {
@@ -59,9 +63,46 @@ function createWindow(): void {
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 }
 
+function initializeAutoUpdates(): void {
+  if (!app.isPackaged) {
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-update error', error);
+  });
+
+  autoUpdater.on('update-downloaded', async () => {
+    const messageBoxOptions: Electron.MessageBoxOptions = {
+      type: 'info',
+      buttons: ['Restart now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Update ready',
+      message: 'A new version of Scholar has been downloaded.',
+      detail: 'Restart the app now to finish installing the update.',
+    };
+
+    const { response } =
+      mainWindow && !mainWindow.isDestroyed()
+        ? await dialog.showMessageBox(mainWindow, messageBoxOptions)
+        : await dialog.showMessageBox(messageBoxOptions);
+
+    if (response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+
+  void autoUpdater.checkForUpdatesAndNotify();
+}
+
 app.whenReady().then(() => {
   app.setName('Scholar');
   createWindow();
+  initializeAutoUpdates();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -71,6 +112,8 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  mainWindow = null;
+
   if (process.platform !== 'darwin') {
     app.quit();
   }
