@@ -34,7 +34,7 @@ export function AuthShell({
   title,
 }: AuthShellProps) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#060816]">
+    <div className="app-scroll-shell relative min-h-screen w-full overflow-hidden bg-[#060816]">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.2),_transparent_58%)]" />
         <div className="absolute bottom-0 left-[-10%] h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl" />
