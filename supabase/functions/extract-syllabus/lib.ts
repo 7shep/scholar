@@ -16,6 +16,7 @@ export type AssignmentCandidate = {
   dueAt: string | null;
   type: string;
   confidence: number;
+  weightPercent: number | null;
 };
 
 export type ParsedRequest =
@@ -119,9 +120,10 @@ export const RESPONSE_SCHEMA = {
       dueDate: { type: "STRING", nullable: true },
       type: { type: "STRING", enum: [...ASSIGNMENT_TYPES] },
       confidence: { type: "NUMBER" },
+      weightPercent: { type: "NUMBER", nullable: true },
     },
-    required: ["title", "dueDate", "type", "confidence"],
-    propertyOrdering: ["title", "dueDate", "type", "confidence"],
+    required: ["title", "dueDate", "type", "confidence", "weightPercent"],
+    propertyOrdering: ["title", "dueDate", "type", "confidence", "weightPercent"],
   },
 } as const;
 
@@ -131,7 +133,10 @@ const SYSTEM_INSTRUCTION =
   "quizzes, exams, presentations, labs, and readings or discussions that have a " +
   "deadline. Ignore office hours, policies, grading scales, holidays, and generic " +
   "schedule rows that have no deliverable. Give each item a concise title, an " +
-  "absolute due date, a type, and your confidence.";
+  "absolute due date, a type, a weight percentage when stated, and your confidence. " +
+  "Look carefully at grading breakdown, assessment, evaluation, and mark distribution " +
+  "sections and connect those weights to assignment items when the title or category " +
+  "clearly matches.";
 
 function buildContextText(courseTerm: string | null | undefined, today: Date): string {
   const todayIso = today.toISOString().slice(0, 10);
@@ -142,8 +147,15 @@ function buildContextText(courseTerm: string | null | undefined, today: Date): s
     "Resolve every due date to an absolute ISO 8601 datetime. If the syllabus omits " +
     "the year, infer it from the term and today's date so the date is the upcoming " +
     "occurrence. If a specific time is given, use it; otherwise use 23:59 local time. " +
-    "If you cannot determine a date for an item, set dueDate to null. Do not invent " +
-    "assignments that are not present in the document."
+    "If you cannot determine a date for an item, set dueDate to null. If a specific " +
+    "item has an explicit grade weight like 10%, return weightPercent as the numeric " +
+    "percentage without the percent sign; otherwise return null. Do not infer a weight " +
+    "from the overall grading breakdown unless the syllabus clearly ties it to that " +
+    "specific assignment or category. Use grading tables and category lists when they " +
+    "clearly map to an extracted item, for example Essay 1 -> Essays 15%, Midterm -> " +
+    "Midterm Exam 25%, Labs -> Lab Reports 20%. If a percentage only applies to a broad " +
+    "participation bucket or to multiple items that cannot be matched confidently, return " +
+    "null instead of guessing. Do not invent assignments that are not present in the document."
   );
 }
 
@@ -205,7 +217,16 @@ function normalizeCandidate(raw: unknown): AssignmentCandidate | null {
       : 0.5;
   confidence = Math.min(1, Math.max(0, confidence));
 
-  return { title, dueAt, type, confidence };
+  let weightPercent =
+    typeof raw.weightPercent === "number" && Number.isFinite(raw.weightPercent)
+      ? raw.weightPercent
+      : null;
+
+  if (weightPercent != null) {
+    weightPercent = Math.min(100, Math.max(0, Math.round(weightPercent * 10) / 10));
+  }
+
+  return { title, dueAt, type, confidence, weightPercent };
 }
 
 export function parseGeminiResponse(response: unknown): AssignmentCandidate[] {

@@ -18,6 +18,9 @@ create table if not exists public.assignments (
   status text not null default 'todo' check (status in ('todo', 'done', 'completed')),
   difficulty text check (difficulty in ('easy', 'medium', 'hard')),
   estimated_minutes integer check (estimated_minutes is null or estimated_minutes >= 0),
+  weight_percent numeric(5, 2) check (
+    weight_percent is null or (weight_percent >= 0 and weight_percent <= 100)
+  ),
   created_at timestamptz not null default now()
 );
 
@@ -218,7 +221,8 @@ insert into public.assignments (
   due_at,
   status,
   difficulty,
-  estimated_minutes
+  estimated_minutes,
+  weight_percent
 )
 values (
   'YOUR_USER_ID_HERE',
@@ -227,5 +231,6 @@ values (
   now() + interval '2 days',
   'todo',
   'medium',
-  90
+  90,
+  15
 );

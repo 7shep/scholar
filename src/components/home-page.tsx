@@ -228,7 +228,7 @@ export function HomePage({
   return (
     <>
       <main className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-[#CCFF00] selection:text-slate-900">
-        <div className="mx-auto flex min-h-screen w-full max-w-[1600px] flex-col lg:flex-row">
+        <div className="flex min-h-screen w-full flex-col lg:flex-row">
           <Sidebar
             activeView={activeView}
             displayName={displayName}

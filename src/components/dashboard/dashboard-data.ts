@@ -24,6 +24,7 @@ export type AssignmentRow = {
   status: string | null;
   title: string;
   user_id: string;
+  weight_percent: number | null;
 };
 
 export type DashboardStatus = "loading" | "error" | "empty" | "ready";
@@ -118,6 +119,7 @@ export type AssignmentsListItem = {
   isCompleted: boolean;
   isOverdue: boolean;
   title: string;
+  weightPercent: number | null;
 };
 
 export type AssignmentsSection = {
@@ -159,6 +161,7 @@ export type CreateAssignmentInput = {
   estimatedMinutes?: number | null;
   title: string;
   userId: string;
+  weightPercent?: number | null;
 };
 
 export type UploadCourseDocumentResult = {
@@ -236,6 +239,14 @@ function normalizeEstimatedMinutes(value: number | null | undefined) {
   return Math.round(value);
 }
 
+function normalizeWeightPercent(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value) || value < 0) {
+    return null;
+  }
+
+  return Math.min(100, Math.round(value * 10) / 10);
+}
+
 function isMissingDashboardTableError(error: unknown) {
   if (!error || typeof error !== "object") {
     return false;
@@ -258,6 +269,29 @@ function isMissingDashboardTableError(error: unknown) {
     combinedText.includes("relation") ||
     combinedText.includes("does not exist")
   );
+}
+
+function isMissingAssignmentsWeightColumnError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const { details, hint, message } = error as SupabaseLikeError;
+  const combinedText = [message, details, hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    combinedText.includes("weight_percent") &&
+    (combinedText.includes("schema cache") ||
+      combinedText.includes("column") ||
+      combinedText.includes("does not exist"))
+  );
+}
+
+function getMissingAssignmentsWeightColumnMessage() {
+  return "Your database is missing the new assignments weight column. Run the SQL in docs/supabase-add-weight-percent.sql, then try again.";
 }
 
 function isCompletedStatus(status: string | null) {
@@ -725,6 +759,7 @@ export function buildAssignmentsViewModel(
       isCompleted: isCompletedStatus(assignment.status),
       isOverdue: isOverdueAssignment(assignment, currentDate),
       title: assignment.title,
+      weightPercent: assignment.weight_percent,
     });
 
     groupedAssignments.set(groupId, bucket);
@@ -863,7 +898,7 @@ async function loadAcademicData(userId: string) {
     supabase
       .from("assignments")
       .select(
-        "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+        "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
       )
       .eq("user_id", userId)
       .order("due_at", { ascending: true })
@@ -990,6 +1025,7 @@ export async function uploadCourseSyllabus(
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
+  const normalizedWeightPercent = normalizeWeightPercent(input.weightPercent);
   const { data, error } = await supabase
     .from("assignments")
     .insert({
@@ -1000,13 +1036,20 @@ export async function createAssignment(input: CreateAssignmentInput) {
       status: "todo",
       title: input.title.trim(),
       user_id: input.userId,
+      ...(normalizedWeightPercent != null
+        ? { weight_percent: normalizedWeightPercent }
+        : {}),
     })
     .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
     )
     .single();
 
   if (error) {
+    if (isMissingAssignmentsWeightColumnError(error)) {
+      throw new Error(getMissingAssignmentsWeightColumnMessage());
+    }
+
     throw error;
   }
 
@@ -1018,15 +1061,22 @@ export async function bulkCreateAssignments(inputs: CreateAssignmentInput[]) {
     return [] as AssignmentRow[];
   }
 
-  const payload = inputs.map((input) => ({
-    course_id: input.courseId,
-    difficulty: normalizeOptionalText(input.difficulty)?.toLowerCase(),
-    due_at: input.dueAt ?? null,
-    estimated_minutes: normalizeEstimatedMinutes(input.estimatedMinutes),
-    status: "todo",
-    title: input.title.trim(),
-    user_id: input.userId,
-  }));
+  const payload = inputs.map((input) => {
+    const normalizedWeightPercent = normalizeWeightPercent(input.weightPercent);
+
+    return {
+      course_id: input.courseId,
+      difficulty: normalizeOptionalText(input.difficulty)?.toLowerCase(),
+      due_at: input.dueAt ?? null,
+      estimated_minutes: normalizeEstimatedMinutes(input.estimatedMinutes),
+      status: "todo",
+      title: input.title.trim(),
+      user_id: input.userId,
+      ...(normalizedWeightPercent != null
+        ? { weight_percent: normalizedWeightPercent }
+        : {}),
+    };
+  });
 
   debugTable(
     "assignments-db",
@@ -1044,10 +1094,14 @@ export async function bulkCreateAssignments(inputs: CreateAssignmentInput[]) {
     .from("assignments")
     .insert(payload)
     .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
     );
 
   if (error) {
+    if (isMissingAssignmentsWeightColumnError(error)) {
+      throw new Error(getMissingAssignmentsWeightColumnMessage());
+    }
+
     debugLog("assignments-db", "Insert failed", error);
     throw error;
   }
@@ -1071,7 +1125,7 @@ export async function updateAssignmentStatus(
     })
     .eq("id", input.assignmentId)
     .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
     )
     .single();
 

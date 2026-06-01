@@ -47,6 +47,7 @@ type ManualFormState = {
   dueAt: string;
   estimatedMinutes: string;
   title: string;
+  weightPercent: string;
 };
 
 type CourseFormState = {
@@ -61,6 +62,7 @@ type EditableCandidate = {
   id: string;
   title: string;
   type: string | null;
+  weightPercent: string;
 };
 
 const NEW_COURSE_VALUE = "__new_course__";
@@ -69,6 +71,7 @@ const INITIAL_MANUAL_FORM: ManualFormState = {
   dueAt: "",
   estimatedMinutes: "",
   title: "",
+  weightPercent: "",
 };
 const INITIAL_COURSE_FORM: CourseFormState = {
   color: "#CCFF00",
@@ -147,6 +150,28 @@ function toDateTimeLocalValue(isoDateTime: string | null) {
   const minutes = `${parsed.getMinutes()}`.padStart(2, "0");
 
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toWeightPercentValue(weightPercent: number | null | undefined) {
+  if (weightPercent == null || Number.isNaN(weightPercent) || weightPercent < 0) {
+    return "";
+  }
+
+  return `${weightPercent}`;
+}
+
+function toWeightPercent(weightPercent: string) {
+  if (!weightPercent.trim()) {
+    return null;
+  }
+
+  const parsed = Number(weightPercent);
+
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function FieldLabel({
@@ -290,6 +315,7 @@ export function AddAssignmentModal({
         id: `${index}-${candidate.title}`,
         title: candidate.title,
         type: candidate.type ?? null,
+        weightPercent: toWeightPercentValue(candidate.weightPercent),
       }));
 
       debugTable(
@@ -298,6 +324,7 @@ export function AddAssignmentModal({
         editableCandidates.map((candidate) => ({
           title: candidate.title,
           dueAt: candidate.dueAt || "(none)",
+          weightPercent: candidate.weightPercent || "(none)",
         })),
       );
 
@@ -328,6 +355,7 @@ export function AddAssignmentModal({
           : null,
         title: manualForm.title,
         userId,
+        weightPercent: toWeightPercent(manualForm.weightPercent),
       });
 
       await onDataChanged();
@@ -368,6 +396,7 @@ export function AddAssignmentModal({
           dueAt: candidate.dueAt ?? "(none)",
           type: candidate.type ?? "(none)",
           confidence: candidate.confidence ?? "(none)",
+          weightPercent: candidate.weightPercent ?? "(none)",
         })),
       );
 
@@ -423,6 +452,7 @@ export function AddAssignmentModal({
         dueAt: toIsoDateTime(candidate.dueAt),
         title: candidate.title,
         userId,
+        weightPercent: toWeightPercent(candidate.weightPercent),
       }));
 
       debugTable(
@@ -432,6 +462,7 @@ export function AddAssignmentModal({
           title: payload.title,
           dueAt: payload.dueAt ?? "(none)",
           courseId: payload.courseId,
+          weightPercent: payload.weightPercent ?? "(none)",
         })),
       );
 
@@ -643,6 +674,22 @@ export function AddAssignmentModal({
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
           />
         </div>
+
+        <div className="md:col-span-2">
+          <FieldLabel>Weight (%)</FieldLabel>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.1"
+            value={manualForm.weightPercent}
+            onChange={(event) =>
+              handleManualFormChange("weightPercent", event.target.value)
+            }
+            placeholder="15"
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
+          />
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
@@ -745,22 +792,46 @@ export function AddAssignmentModal({
                   />
                 </div>
 
-                <div>
-                  <FieldLabel>Due date</FieldLabel>
-                  <input
-                    type="datetime-local"
-                    value={candidate.dueAt}
-                    onChange={(event) =>
-                      setReviewCandidates((current) =>
-                        current.map((item) =>
-                          item.id === candidate.id
-                            ? { ...item, dueAt: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
-                  />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <FieldLabel>Due date</FieldLabel>
+                    <input
+                      type="datetime-local"
+                      value={candidate.dueAt}
+                      onChange={(event) =>
+                        setReviewCandidates((current) =>
+                          current.map((item) =>
+                            item.id === candidate.id
+                              ? { ...item, dueAt: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
+                    />
+                  </div>
+
+                  <div>
+                    <FieldLabel>Weight (%)</FieldLabel>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={candidate.weightPercent}
+                      onChange={(event) =>
+                        setReviewCandidates((current) =>
+                          current.map((item) =>
+                            item.id === candidate.id
+                              ? { ...item, weightPercent: event.target.value }
+                              : item,
+                          ),
+                        )
+                      }
+                      placeholder="15"
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -97,12 +97,20 @@ check(
 check("buildGeminiRequest passes the course term", pdfText.includes("Fall 2026"));
 check("buildGeminiRequest passes today's date", pdfText.includes("2026-05-31"));
 check(
+  "buildGeminiRequest tells Gemini to inspect grading breakdown sections",
+  pdfText.includes("grading breakdown") && pdfText.includes("Essay 1 -> Essays 15%"),
+);
+check(
   "buildGeminiRequest asks for JSON output",
   pdfReq.generationConfig?.responseMimeType === "application/json",
 );
 check(
   "buildGeminiRequest includes a response schema",
   pdfReq.generationConfig?.responseSchema != null,
+);
+check(
+  "buildGeminiRequest asks Gemini for weightPercent",
+  JSON.stringify(pdfReq.generationConfig?.responseSchema).includes("weightPercent"),
 );
 check(
   "buildGeminiRequest uses deterministic temperature",
@@ -131,8 +139,20 @@ function geminiResponse(items) {
 
 const parsed = parseGeminiResponse(
   geminiResponse([
-    { title: "Essay 1", dueDate: "2026-09-15T23:59:00", type: "homework", confidence: 0.9 },
-    { title: "Reading", dueDate: null, type: "reading", confidence: 0.4 },
+    {
+      title: "Essay 1",
+      dueDate: "2026-09-15T23:59:00",
+      type: "homework",
+      confidence: 0.9,
+      weightPercent: 15,
+    },
+    {
+      title: "Reading",
+      dueDate: null,
+      type: "reading",
+      confidence: 0.4,
+      weightPercent: null,
+    },
   ]),
 );
 check("parseGeminiResponse returns both valid items", parsed.length === 2);
@@ -140,12 +160,34 @@ check(
   "parseGeminiResponse maps dueDate to dueAt",
   parsed[0]?.dueAt === "2026-09-15T23:59:00" && parsed[1]?.dueAt === null,
 );
+check(
+  "parseGeminiResponse keeps weightPercent when present",
+  parsed[0]?.weightPercent === 15 && parsed[1]?.weightPercent === null,
+);
 
 const cleaned = parseGeminiResponse(
   geminiResponse([
-    { title: "  ", dueDate: "2026-09-15", type: "exam", confidence: 1 }, // dropped: blank title
-    { title: "Quiz", dueDate: "not-a-date", type: "quiz", confidence: 0.5 }, // dueAt -> null
-    { title: "Lab", dueDate: "2026-10-01", type: "weird", confidence: 5 }, // type -> other, conf clamped
+    {
+      title: "  ",
+      dueDate: "2026-09-15",
+      type: "exam",
+      confidence: 1,
+      weightPercent: 30,
+    }, // dropped: blank title
+    {
+      title: "Quiz",
+      dueDate: "not-a-date",
+      type: "quiz",
+      confidence: 0.5,
+      weightPercent: "heavy",
+    }, // dueAt -> null, weight -> null
+    {
+      title: "Lab",
+      dueDate: "2026-10-01",
+      type: "weird",
+      confidence: 5,
+      weightPercent: 120,
+    }, // type -> other, conf clamped, weight clamped
   ]),
 );
 check("parseGeminiResponse drops items without a title", cleaned.length === 2);
@@ -156,6 +198,10 @@ check(
 check(
   "parseGeminiResponse normalizes unknown type and clamps confidence",
   cleaned[1]?.type === "other" && cleaned[1]?.confidence === 1,
+);
+check(
+  "parseGeminiResponse normalizes and clamps weightPercent",
+  cleaned[0]?.weightPercent === null && cleaned[1]?.weightPercent === 100,
 );
 
 check(

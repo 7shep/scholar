@@ -47,6 +47,30 @@ function formatItemCount(count: number) {
   return `${count} item${count === 1 ? "" : "s"}`;
 }
 
+function formatWeightPercent(weightPercent: number | null) {
+  if (weightPercent == null || Number.isNaN(weightPercent) || weightPercent <= 0) {
+    return null;
+  }
+
+  return `${weightPercent}%`;
+}
+
+function getWeightBadgeClassName(weightPercent: number | null) {
+  if (weightPercent == null || Number.isNaN(weightPercent) || weightPercent <= 0) {
+    return null;
+  }
+
+  if (weightPercent >= 30) {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  if (weightPercent >= 15) {
+    return "bg-amber-100 text-amber-700";
+  }
+
+  return "bg-emerald-100 text-emerald-700";
+}
+
 function AssignmentsLoadingState() {
   return (
     <div className="animate-fade-in-up space-y-6">
@@ -263,6 +287,14 @@ export function AssignmentsPage({
 
   const isZeroData = status === "empty";
   const showEmptyState = isZeroData || viewModel.sections.length === 0;
+  const showCaughtUpMessage =
+    !isZeroData &&
+    (activeFilter === "all" ||
+      activeFilter === "upcoming" ||
+      activeFilter === "overdue") &&
+    selectedCourseId === "all" &&
+    deferredSearchQuery.trim().length === 0 &&
+    viewModel.sections.length === 0;
 
   return (
     <div className="space-y-6">
@@ -372,7 +404,13 @@ export function AssignmentsPage({
         </div>
       </section>
 
-      {showEmptyState ? (
+      {showCaughtUpMessage ? (
+        <p className="animate-fade-in-up px-2 text-base font-medium text-slate-500">
+          Nothing to show here, you&apos;re all caught up!
+        </p>
+      ) : null}
+
+      {showEmptyState && !showCaughtUpMessage ? (
         <section className="animate-fade-in-up rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
             {isZeroData ? "Start here" : "Nothing to show"}
@@ -426,6 +464,10 @@ export function AssignmentsPage({
               <div className="space-y-3">
                 {section.items.map((assignment) => {
                   const isPending = pendingAssignmentId === assignment.id;
+                  const weightLabel = formatWeightPercent(assignment.weightPercent);
+                  const weightBadgeClassName = getWeightBadgeClassName(
+                    assignment.weightPercent,
+                  );
 
                   return (
                     <article
@@ -481,6 +523,13 @@ export function AssignmentsPage({
                             <Clock3 className="h-3 w-3" />
                             {assignment.dueLabel}
                           </span>
+                          {weightLabel && weightBadgeClassName ? (
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 ${weightBadgeClassName}`}
+                            >
+                              Weight {weightLabel}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
 
