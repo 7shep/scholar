@@ -1,13 +1,13 @@
 {
   "name": "school-organizer",
   "productName": "Scholar",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "private": true,
   "description": "Desktop planner for courses, assignments, and grades.",
   "author": "7shep",
   "repository": {
     "type": "git",
-    "url": "https://github.com/7shep/school-organizer.git"
+    "url": "https://github.com/7shep/scholar.git"
   },
   "main": "dist/electron/main.js",
   "scripts": {
@@ -19,8 +19,13 @@
     "dev:electron": "tsc -p tsconfig.electron.json --watch --preserveWatchOutput",
     "dev:renderer": "vite",
     "dist": "npm run build && electron-builder --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg zip --universal --publish never",
+    "dist:mac:dir": "npm run build && electron-builder --mac dir --universal --publish never",
+    "dist:mac:unsigned": "npm run build && electron-builder --mac dmg zip --universal --publish never -c.mac.identity=null -c.mac.hardenedRuntime=false",
+    "dist:win": "npm run build && electron-builder --win nsis --publish never",
     "release": "npm run build && electron-builder --publish always",
-    "release:mac": "npm run build && electron-builder --mac dmg zip --publish always",
+    "release:mac": "npm run build && electron-builder --mac dmg zip --universal --publish always",
+    "release:mac:unsigned": "npm run build && electron-builder --mac dmg zip --universal --publish always -c.mac.identity=null -c.mac.hardenedRuntime=false",
     "release:win": "npm run build && electron-builder --win nsis --publish always",
     "start": "npm run build && electron ."
   },
@@ -40,7 +45,7 @@
       {
         "provider": "github",
         "owner": "7shep",
-        "repo": "school-organizer",
+        "repo": "scholar",
         "releaseType": "draft"
       }
     ],
@@ -49,7 +54,8 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "hardenedRuntime": true
     },
     "win": {
       "target": [
