@@ -1,13 +1,13 @@
 {
   "name": "school-organizer",
   "productName": "Scholar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Desktop planner for courses, assignments, and grades.",
   "author": "7shep",
   "repository": {
     "type": "git",
-    "url": "https://github.com/7shep/school-organizer.git"
+    "url": "https://github.com/7shep/scholar.git"
   },
   "main": "dist/electron/main.js",
   "scripts": {
@@ -45,7 +45,7 @@
       {
         "provider": "github",
         "owner": "7shep",
-        "repo": "school-organizer",
+        "repo": "scholar",
         "releaseType": "draft"
       }
     ],
