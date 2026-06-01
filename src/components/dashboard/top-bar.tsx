@@ -10,9 +10,10 @@ import {
 
 type TopBarProps = {
   displayName: string;
+  onQuickAdd?: () => void;
 };
 
-export function TopBar({ displayName }: TopBarProps) {
+export function TopBar({ displayName, onQuickAdd }: TopBarProps) {
   const today = new Date();
   const firstName = getFirstName(displayName);
   const greeting = getGreeting(today);
@@ -31,6 +32,16 @@ export function TopBar({ displayName }: TopBarProps) {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {onQuickAdd ? (
+            <button
+              type="button"
+              onClick={onQuickAdd}
+              className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              Add Assignment
+            </button>
+          ) : null}
+
           <label className="relative block min-w-0 sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
