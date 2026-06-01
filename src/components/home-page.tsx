@@ -29,6 +29,7 @@ type HomePageProps = {
 };
 
 type AppView = "assignments" | "dashboard" | "grades";
+type AppTheme = "dark" | "light";
 
 function DashboardLoadingState() {
   return (
@@ -189,7 +190,28 @@ export function HomePage({
     viewModel,
   } = useDashboardData(userId);
   const [activeView, setActiveView] = React.useState<AppView>("dashboard");
+  const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const savedTheme = window.localStorage.getItem("scholar-theme");
+
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem("scholar-theme", theme);
+  }, [theme]);
 
   const handleOpenAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(true);
@@ -252,13 +274,27 @@ export function HomePage({
 
   return (
     <>
-      <main className="app-scroll-shell min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-[#CCFF00] selection:text-slate-900">
-        <div className="flex min-h-screen w-full flex-col lg:flex-row">
+      <main
+        className={`app-scroll-shell min-h-screen selection:bg-[#CCFF00] selection:text-slate-900 ${
+          theme === "dark" ? "bg-slate-950 text-slate-50" : "bg-[#FAFAFA] text-slate-900"
+        }`}
+      >
+        <div
+          className={`flex min-h-screen w-full flex-col lg:flex-row ${
+            theme === "dark" ? "app-theme-dark bg-slate-950 text-slate-50" : "app-theme-light bg-[#FAFAFA] text-slate-900"
+          }`}
+        >
           <Sidebar
             activeView={activeView}
             isSigningOut={isSigningOut}
             onNavigate={setActiveView}
             onSignOut={onSignOut}
+            onToggleTheme={() =>
+              setTheme((currentTheme) =>
+                currentTheme === "light" ? "dark" : "light",
+              )
+            }
+            theme={theme}
           />
 
           <div className="flex min-h-screen min-w-0 flex-1 flex-col">

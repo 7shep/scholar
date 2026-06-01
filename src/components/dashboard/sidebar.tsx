@@ -8,7 +8,9 @@ import {
   ChevronDown,
   LayoutDashboard,
   LogOut,
+  Moon,
   Settings,
+  Sun,
 } from "lucide-react";
 
 import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
@@ -18,6 +20,8 @@ type SidebarProps = {
   isSigningOut: boolean;
   onNavigate: (view: "assignments" | "dashboard" | "grades") => void;
   onSignOut: () => Promise<void> | void;
+  onToggleTheme: () => void;
+  theme: "dark" | "light";
 };
 
 const navigationItems = [
@@ -31,8 +35,11 @@ export function Sidebar({
   isSigningOut,
   onNavigate,
   onSignOut,
+  onToggleTheme,
+  theme,
 }: SidebarProps) {
   const termLabel = getAcademicTermLabel();
+  const ThemeIcon = theme === "light" ? Sun : Moon;
 
   return (
     <aside className="border-b border-slate-200 bg-white/95 backdrop-blur lg:h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r">
@@ -50,22 +57,42 @@ export function Sidebar({
               </div>
             </div>
 
+            <div className="hidden items-center gap-2 lg:mt-5 lg:inline-flex">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+              >
+                {termLabel}
+                <ChevronDown className="h-4 w-4 text-slate-500" />
+              </button>
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100"
+                aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              >
+                <ThemeIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 flex items-center gap-2 lg:hidden">
             <button
               type="button"
-              className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 lg:mt-5 lg:inline-flex"
+              className="inline-flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
             >
               {termLabel}
               <ChevronDown className="h-4 w-4 text-slate-500" />
             </button>
+            <button
+              type="button"
+              onClick={onToggleTheme}
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-900 transition hover:bg-slate-100"
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            >
+              <ThemeIcon className="h-4 w-4" />
+            </button>
           </div>
-
-          <button
-            type="button"
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 lg:hidden"
-          >
-            {termLabel}
-            <ChevronDown className="h-4 w-4 text-slate-500" />
-          </button>
 
           <nav className="mt-6 flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
             {navigationItems.map((item) => (

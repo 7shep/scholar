@@ -87,7 +87,7 @@ export function StatsRow({ stats }: StatsRowProps) {
       </article>
 
       <article
-        className="animate-fade-in-up rounded-[1.75rem] border border-lime-300 bg-[#CCFF00] p-5 shadow-sm"
+        className="completion-rate-card animate-fade-in-up rounded-[1.75rem] border border-lime-300 bg-[#CCFF00] p-5 shadow-sm"
         style={{ animationDelay: "240ms" }}
       >
         <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/55">
