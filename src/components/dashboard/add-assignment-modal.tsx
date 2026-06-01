@@ -43,7 +43,6 @@ type ModalStep =
   | "syllabus-review";
 
 type ManualFormState = {
-  difficulty: string;
   dueAt: string;
   estimatedMinutes: string;
   title: string;
@@ -52,6 +51,7 @@ type ManualFormState = {
 
 type CourseFormState = {
   color: string;
+  isTwoSemesterCourse: boolean;
   name: string;
   term: string;
 };
@@ -67,7 +67,6 @@ type EditableCandidate = {
 
 const NEW_COURSE_VALUE = "__new_course__";
 const INITIAL_MANUAL_FORM: ManualFormState = {
-  difficulty: "",
   dueAt: "",
   estimatedMinutes: "",
   title: "",
@@ -75,6 +74,7 @@ const INITIAL_MANUAL_FORM: ManualFormState = {
 };
 const INITIAL_COURSE_FORM: CourseFormState = {
   color: "#CCFF00",
+  isTwoSemesterCourse: false,
   name: "",
   term: "",
 };
@@ -244,7 +244,10 @@ export function AddAssignmentModal({
   }, [onClose]);
 
   const handleCourseFormChange = React.useCallback(
-    (field: keyof CourseFormState, value: string) => {
+    (
+      field: keyof CourseFormState,
+      value: string | boolean,
+    ) => {
       setCourseForm((current) => ({
         ...current,
         [field]: value,
@@ -286,6 +289,7 @@ export function AddAssignmentModal({
 
     const createdCourse = await createCourse({
       color: courseForm.color,
+      credits: courseForm.isTwoSemesterCourse ? 6 : 3,
       name: courseForm.name,
       term: courseForm.term,
       userId,
@@ -298,6 +302,7 @@ export function AddAssignmentModal({
     return createdCourse.id;
   }, [
     courseForm.color,
+    courseForm.isTwoSemesterCourse,
     courseForm.name,
     courseForm.term,
     onDataChanged,
@@ -348,7 +353,6 @@ export function AddAssignmentModal({
 
       await createAssignment({
         courseId,
-        difficulty: manualForm.difficulty,
         dueAt: toIsoDateTime(manualForm.dueAt),
         estimatedMinutes: manualForm.estimatedMinutes
           ? Number(manualForm.estimatedMinutes)
@@ -564,6 +568,31 @@ export function AddAssignmentModal({
               />
             </div>
           </div>
+
+          <div className="md:col-span-2">
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <input
+                type="checkbox"
+                checked={courseForm.isTwoSemesterCourse}
+                onChange={(event) =>
+                  handleCourseFormChange(
+                    "isTwoSemesterCourse",
+                    event.target.checked,
+                  )
+                }
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-lime-300"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  2 Semester Course (ex: MATH110A, MATH110B)
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Checked courses are saved as 6 credits. Unchecked courses are
+                  saved as 3 credits.
+                </p>
+              </div>
+            </label>
+          </div>
         </div>
       ) : null}
     </div>
@@ -645,22 +674,6 @@ export function AddAssignmentModal({
         </div>
 
         <div>
-          <FieldLabel>Difficulty</FieldLabel>
-          <select
-            value={manualForm.difficulty}
-            onChange={(event) =>
-              handleManualFormChange("difficulty", event.target.value)
-            }
-            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
-          >
-            <option value="">Unspecified</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-
-        <div className="md:col-span-2">
           <FieldLabel>Estimated minutes</FieldLabel>
           <input
             type="number"
@@ -675,7 +688,7 @@ export function AddAssignmentModal({
           />
         </div>
 
-        <div className="md:col-span-2">
+        <div>
           <FieldLabel>Weight (%)</FieldLabel>
           <input
             type="number"
@@ -698,7 +711,7 @@ export function AddAssignmentModal({
             This saves directly to {currentCourseName || "your course"}.
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            You can come back later to mark it complete or edit the details.
+            Priority will be derived automatically from the assignment weight.
           </p>
         </div>
         <CalendarDays className="h-5 w-5 shrink-0 text-slate-400" />

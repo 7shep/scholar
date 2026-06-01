@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 import {
   formatLongDate,
@@ -10,10 +10,9 @@ import {
 
 type TopBarProps = {
   displayName: string;
-  onQuickAdd: () => void;
 };
 
-export function TopBar({ displayName, onQuickAdd }: TopBarProps) {
+export function TopBar({ displayName }: TopBarProps) {
   const today = new Date();
   const firstName = getFirstName(displayName);
   const greeting = getGreeting(today);
@@ -43,25 +42,6 @@ export function TopBar({ displayName, onQuickAdd }: TopBarProps) {
               Ctrl K
             </span>
           </label>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="relative inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-transparent text-slate-400 transition hover:border-slate-200 hover:bg-white hover:text-slate-900"
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full border-2 border-[#FAFAFA] bg-rose-500" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onQuickAdd}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-            >
-              <Plus className="h-4 w-4" />
-              Add Assignment
-            </button>
-          </div>
         </div>
       </div>
     </header>
