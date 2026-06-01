@@ -3,8 +3,9 @@
 import * as React from "react";
 
 import { supabase } from "@/lib/supabase";
+import { debugLog, debugTable } from "@/lib/debug-log";
 
-type CourseRow = {
+export type CourseRow = {
   color: string | null;
   created_at: string | null;
   id: string;
@@ -13,7 +14,7 @@ type CourseRow = {
   user_id: string;
 };
 
-type AssignmentRow = {
+export type AssignmentRow = {
   course_id: string | null;
   created_at: string | null;
   difficulty: string | null;
@@ -76,9 +77,11 @@ export type DashboardViewModel = {
   stats: DashboardStats;
 };
 
-type DashboardDataResult = {
+export type DashboardDataResult = {
+  assignments: AssignmentRow[];
   courses: DashboardCourseOption[];
   error: string | null;
+  rawCourses: CourseRow[];
   reload: () => Promise<void>;
   status: DashboardStatus;
   viewModel: DashboardViewModel | null;
@@ -89,6 +92,50 @@ export type DashboardCourseOption = {
   id: string;
   name: string;
   term: string | null;
+};
+
+export type AssignmentsStatusFilter =
+  | "all"
+  | "upcoming"
+  | "completed"
+  | "overdue";
+
+export type AssignmentsSortOption = "due-date";
+
+export type AssignmentsCourseChip = {
+  color: string | null;
+  count: number;
+  id: string;
+  label: string;
+};
+
+export type AssignmentsListItem = {
+  course: string;
+  courseColor: string | null;
+  courseId: string | null;
+  dueLabel: string;
+  id: string;
+  isCompleted: boolean;
+  isOverdue: boolean;
+  title: string;
+};
+
+export type AssignmentsSection = {
+  id: string;
+  itemCount: number;
+  items: AssignmentsListItem[];
+  label: string;
+};
+
+export type AssignmentsViewModel = {
+  completedCount: number;
+  courseChips: AssignmentsCourseChip[];
+  dueThisWeekCount: number;
+  emptyMessage: string;
+  openCount: number;
+  overdueCount: number;
+  sections: AssignmentsSection[];
+  totalCount: number;
 };
 
 export type CreateCourseInput = {
@@ -119,6 +166,11 @@ export type UploadCourseDocumentResult = {
   id: string;
   mimeType: string;
   storagePath: string;
+};
+
+export type UpdateAssignmentStatusInput = {
+  assignmentId: string;
+  isCompleted: boolean;
 };
 
 type SupabaseLikeError = {
@@ -369,6 +421,108 @@ function formatEstimatedLabel(estimatedMinutes: number | null) {
   return `About ${hours.toFixed(1)} hours`;
 }
 
+function getStartOfDay(date: Date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function getDayDifference(left: Date, right: Date) {
+  return Math.round(
+    (getStartOfDay(left).getTime() - getStartOfDay(right).getTime()) / 86400000,
+  );
+}
+
+function isOverdueAssignment(
+  assignment: AssignmentRow,
+  currentDate: Date,
+  completed = isCompletedStatus(assignment.status),
+) {
+  if (completed || !assignment.due_at) {
+    return false;
+  }
+
+  const dueDate = new Date(assignment.due_at);
+
+  return !Number.isNaN(dueDate.getTime()) && dueDate.getTime() < currentDate.getTime();
+}
+
+function formatAssignmentTimeline(dueAt: string | null, currentDate: Date) {
+  if (!dueAt) {
+    return "No due date";
+  }
+
+  const dueDate = new Date(dueAt);
+
+  if (Number.isNaN(dueDate.getTime())) {
+    return "No due date";
+  }
+
+  const dayDifference = getDayDifference(dueDate, currentDate);
+  const timeLabel = formatTime(dueDate);
+
+  if (dayDifference === 0) {
+    return `Today, ${timeLabel}`;
+  }
+
+  if (dayDifference === -1) {
+    return `Yesterday, ${timeLabel}`;
+  }
+
+  if (dayDifference === 1) {
+    return `Tomorrow, ${timeLabel}`;
+  }
+
+  if (dayDifference > 1 && dayDifference <= 6) {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      weekday: "short",
+    }).format(dueDate);
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+  }).format(dueDate);
+}
+
+function getAssignmentGroup(
+  assignment: AssignmentRow,
+  currentDate: Date,
+  completed = isCompletedStatus(assignment.status),
+) {
+  if (completed) {
+    return "completed";
+  }
+
+  if (isOverdueAssignment(assignment, currentDate, completed)) {
+    return "overdue";
+  }
+
+  if (!assignment.due_at) {
+    return "later";
+  }
+
+  const dueDate = new Date(assignment.due_at);
+
+  if (Number.isNaN(dueDate.getTime())) {
+    return "later";
+  }
+
+  if (isSameDate(dueDate, currentDate)) {
+    return "today";
+  }
+
+  if (isWithinThisWeek(dueDate, currentDate)) {
+    return "this-week";
+  }
+
+  return "later";
+}
+
 function compareAssignments(left: AssignmentRow, right: AssignmentRow) {
   const leftDue = left.due_at ? new Date(left.due_at).getTime() : Number.MAX_SAFE_INTEGER;
   const rightDue = right.due_at ? new Date(right.due_at).getTime() : Number.MAX_SAFE_INTEGER;
@@ -412,7 +566,10 @@ function buildCalendarDays(
   });
 }
 
-function buildViewModel(courses: CourseRow[], assignments: AssignmentRow[]) {
+export function buildDashboardViewModel(
+  courses: CourseRow[],
+  assignments: AssignmentRow[],
+) {
   const currentDate = new Date();
   const courseNames = new Map(courses.map((course) => [course.id, course.name]));
   const sortedAssignments = [...assignments].sort(compareAssignments);
@@ -499,7 +656,204 @@ function buildCourseOptions(courses: CourseRow[]): DashboardCourseOption[] {
   }));
 }
 
-async function loadDashboardViewModel(userId: string) {
+export function buildAssignmentsViewModel(
+  courses: CourseRow[],
+  assignments: AssignmentRow[],
+  options: {
+    courseId?: string;
+    query?: string;
+    status?: AssignmentsStatusFilter;
+    sort?: AssignmentsSortOption;
+  } = {},
+): AssignmentsViewModel {
+  const currentDate = new Date();
+  const selectedCourseId = options.courseId ?? "all";
+  const normalizedQuery = options.query?.trim().toLowerCase() ?? "";
+  const activeStatus = options.status ?? "all";
+  const courseLookup = new Map(
+    courses.map((course) => [
+      course.id,
+      { color: course.color, name: course.name },
+    ]),
+  );
+
+  const matchingStatusAssignments = assignments.filter((assignment) => {
+    const completed = isCompletedStatus(assignment.status);
+    const overdue = isOverdueAssignment(assignment, currentDate, completed);
+
+    if (activeStatus === "completed") {
+      return completed;
+    }
+
+    if (activeStatus === "overdue") {
+      return overdue;
+    }
+
+    if (activeStatus === "upcoming") {
+      return !completed && !overdue;
+    }
+
+    return !completed;
+  });
+
+  const filteredAssignments = matchingStatusAssignments.filter((assignment) => {
+    const matchesCourse =
+      selectedCourseId === "all" || assignment.course_id === selectedCourseId;
+    const courseName =
+      courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned";
+    const searchText = `${assignment.title} ${courseName}`.toLowerCase();
+    const matchesQuery =
+      normalizedQuery.length === 0 || searchText.includes(normalizedQuery);
+
+    return matchesCourse && matchesQuery;
+  });
+
+  const sortedAssignments = [...filteredAssignments].sort(compareAssignments);
+  const groupedAssignments = new Map<string, AssignmentsListItem[]>();
+
+  sortedAssignments.forEach((assignment) => {
+    const groupId = getAssignmentGroup(assignment, currentDate);
+    const course = courseLookup.get(assignment.course_id ?? "");
+    const bucket = groupedAssignments.get(groupId) ?? [];
+
+    bucket.push({
+      course: course?.name ?? "Unassigned",
+      courseColor: course?.color ?? null,
+      courseId: assignment.course_id,
+      dueLabel: formatAssignmentTimeline(assignment.due_at, currentDate),
+      id: assignment.id,
+      isCompleted: isCompletedStatus(assignment.status),
+      isOverdue: isOverdueAssignment(assignment, currentDate),
+      title: assignment.title,
+    });
+
+    groupedAssignments.set(groupId, bucket);
+  });
+
+  const sectionsOrder = [
+    { id: "overdue", label: "Overdue" },
+    { id: "today", label: "Today" },
+    { id: "this-week", label: "This Week" },
+    { id: "later", label: "Later" },
+    { id: "completed", label: "Completed" },
+  ] as const;
+
+  const sections = sectionsOrder
+    .map((section) => {
+      const items = groupedAssignments.get(section.id) ?? [];
+
+      return {
+        id: section.id,
+        itemCount: items.length,
+        items,
+        label: section.label,
+      } satisfies AssignmentsSection;
+    })
+    .filter((section) => {
+      if (section.itemCount === 0) {
+        return false;
+      }
+
+      if (activeStatus === "all") {
+        return section.id !== "completed";
+      }
+
+      if (activeStatus === "upcoming") {
+        return section.id !== "overdue" && section.id !== "completed";
+      }
+
+      if (activeStatus === "overdue") {
+        return section.id === "overdue";
+      }
+
+      return section.id === "completed";
+    });
+
+  const courseCounts = new Map<string, number>();
+  matchingStatusAssignments.forEach((assignment) => {
+    if (normalizedQuery.length > 0) {
+      const courseName =
+        courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned";
+      const searchText = `${assignment.title} ${courseName}`.toLowerCase();
+
+      if (!searchText.includes(normalizedQuery)) {
+        return;
+      }
+    }
+
+    if (!assignment.course_id) {
+      return;
+    }
+
+    courseCounts.set(
+      assignment.course_id,
+      (courseCounts.get(assignment.course_id) ?? 0) + 1,
+    );
+  });
+
+  const courseChips: AssignmentsCourseChip[] = [
+    {
+      color: null,
+      count: filteredAssignments.length,
+      id: "all",
+      label: "All courses",
+    },
+    ...courses
+      .map((course) => ({
+        color: course.color,
+        count: courseCounts.get(course.id) ?? 0,
+        id: course.id,
+        label: course.name,
+      }))
+      .filter((course) => course.count > 0 || course.id === selectedCourseId),
+  ];
+
+  const openAssignments = assignments.filter(
+    (assignment) => !isCompletedStatus(assignment.status),
+  );
+  const completedAssignments = assignments.filter((assignment) =>
+    isCompletedStatus(assignment.status),
+  );
+  const dueThisWeekCount = openAssignments.filter((assignment) => {
+    if (!assignment.due_at) {
+      return false;
+    }
+
+    const date = new Date(assignment.due_at);
+    return !Number.isNaN(date.getTime()) && isWithinThisWeek(date, currentDate);
+  }).length;
+  const overdueCount = openAssignments.filter((assignment) =>
+    isOverdueAssignment(assignment, currentDate),
+  ).length;
+
+  let emptyMessage = "No assignments match your current filters.";
+
+  if (assignments.length === 0) {
+    emptyMessage =
+      courses.length === 0
+        ? "Start by creating a course or importing a syllabus, then your assignments will appear here."
+        : "No assignments yet. Add one manually or import them from a syllabus to get started.";
+  } else if (activeStatus === "completed") {
+    emptyMessage = "No completed assignments match this view yet.";
+  } else if (activeStatus === "overdue") {
+    emptyMessage = "Nothing is overdue right now.";
+  } else if (activeStatus === "upcoming") {
+    emptyMessage = "No upcoming assignments match this view.";
+  }
+
+  return {
+    completedCount: completedAssignments.length,
+    courseChips,
+    dueThisWeekCount,
+    emptyMessage,
+    openCount: openAssignments.length,
+    overdueCount,
+    sections,
+    totalCount: assignments.length,
+  };
+}
+
+async function loadAcademicData(userId: string) {
   const [coursesResult, assignmentsResult] = await Promise.all([
     supabase
       .from("courses")
@@ -549,8 +903,19 @@ async function loadDashboardViewModel(userId: string) {
   })();
 
   return {
-    courses: buildCourseOptions(courses),
-    viewModel: buildViewModel(courses, assignments),
+    assignments,
+    courses,
+  };
+}
+
+async function loadDashboardViewModel(userId: string) {
+  const data = await loadAcademicData(userId);
+
+  return {
+    assignments: data.assignments,
+    courses: buildCourseOptions(data.courses),
+    rawCourses: data.courses,
+    viewModel: buildDashboardViewModel(data.courses, data.assignments),
   };
 }
 
@@ -648,8 +1013,79 @@ export async function createAssignment(input: CreateAssignmentInput) {
   return data as AssignmentRow;
 }
 
+export async function bulkCreateAssignments(inputs: CreateAssignmentInput[]) {
+  if (inputs.length === 0) {
+    return [] as AssignmentRow[];
+  }
+
+  const payload = inputs.map((input) => ({
+    course_id: input.courseId,
+    difficulty: normalizeOptionalText(input.difficulty)?.toLowerCase(),
+    due_at: input.dueAt ?? null,
+    estimated_minutes: normalizeEstimatedMinutes(input.estimatedMinutes),
+    status: "todo",
+    title: input.title.trim(),
+    user_id: input.userId,
+  }));
+
+  debugTable(
+    "assignments-db",
+    "Inserting assignments into Supabase",
+    payload.map((row) => ({
+      title: row.title,
+      due_at: row.due_at ?? "(none)",
+      status: row.status,
+      course_id: row.course_id,
+      user_id: row.user_id,
+    })),
+  );
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .insert(payload)
+    .select(
+      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+    );
+
+  if (error) {
+    debugLog("assignments-db", "Insert failed", error);
+    throw error;
+  }
+
+  debugLog(
+    "assignments-db",
+    `Insert succeeded: ${(data ?? []).length} row(s) returned`,
+    data,
+  );
+
+  return (data ?? []) as AssignmentRow[];
+}
+
+export async function updateAssignmentStatus(
+  input: UpdateAssignmentStatusInput,
+) {
+  const { data, error } = await supabase
+    .from("assignments")
+    .update({
+      status: input.isCompleted ? "done" : "todo",
+    })
+    .eq("id", input.assignmentId)
+    .select(
+      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, created_at",
+    )
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as AssignmentRow;
+}
+
 export function useDashboardData(userId: string): DashboardDataResult {
+  const [assignments, setAssignments] = React.useState<AssignmentRow[]>([]);
   const [courses, setCourses] = React.useState<DashboardCourseOption[]>([]);
+  const [rawCourses, setRawCourses] = React.useState<CourseRow[]>([]);
   const [status, setStatus] = React.useState<DashboardStatus>("loading");
   const [viewModel, setViewModel] = React.useState<DashboardViewModel | null>(
     null,
@@ -667,14 +1103,26 @@ export function useDashboardData(userId: string): DashboardDataResult {
         nextResult.viewModel.stats.openAssignments > 0 ||
         nextResult.viewModel.stats.completedAssignments > 0;
 
+      debugLog("dashboard", "Reloaded academic data from Supabase", {
+        status: hasAnyData ? "ready" : "empty",
+        courses: nextResult.rawCourses.length,
+        assignments: nextResult.assignments.length,
+        openAssignments: nextResult.viewModel.stats.openAssignments,
+        completedAssignments: nextResult.viewModel.stats.completedAssignments,
+      });
+
+      setAssignments(nextResult.assignments);
       setCourses(nextResult.courses);
+      setRawCourses(nextResult.rawCourses);
       setViewModel(nextResult.viewModel);
       setStatus(hasAnyData ? "ready" : "empty");
     } catch (loadError) {
       const message = getErrorMessage(loadError);
 
       console.error("Dashboard load failed.", loadError);
+      setAssignments([]);
       setCourses([]);
+      setRawCourses([]);
       setError(message);
       setViewModel(null);
       setStatus("error");
@@ -686,8 +1134,10 @@ export function useDashboardData(userId: string): DashboardDataResult {
   }, [reload]);
 
   return {
+    assignments,
     courses,
     error,
+    rawCourses,
     reload,
     status,
     viewModel,

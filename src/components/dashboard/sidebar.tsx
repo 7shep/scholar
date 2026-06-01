@@ -17,23 +17,27 @@ import {
 } from "@/components/dashboard/dashboard-utils";
 
 type SidebarProps = {
+  activeView: "assignments" | "dashboard";
   displayName: string;
   email?: string;
   isSigningOut: boolean;
+  onNavigate: (view: "assignments" | "dashboard") => void;
   onSignOut: () => Promise<void> | void;
 };
 
 const navigationItems = [
-  { icon: LayoutDashboard, isActive: true, label: "Dashboard" },
-  { icon: CheckSquare, isActive: false, label: "Assignments" },
-  { icon: BarChart3, isActive: false, label: "Grades" },
-  { icon: Calendar, isActive: false, label: "Calendar" },
+  { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
+  { icon: CheckSquare, label: "Assignments", view: "assignments" },
+  { icon: BarChart3, label: "Grades" },
+  { icon: Calendar, label: "Calendar" },
 ] as const;
 
 export function Sidebar({
+  activeView,
   displayName,
   email,
   isSigningOut,
+  onNavigate,
   onSignOut,
 }: SidebarProps) {
   const initials = getInitials(displayName);
@@ -80,8 +84,13 @@ export function Sidebar({
               <button
                 key={item.label}
                 type="button"
+                onClick={() => {
+                  if ("view" in item) {
+                    onNavigate(item.view);
+                  }
+                }}
                 className={`inline-flex min-w-fit items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  item.isActive
+                  "view" in item && activeView === item.view
                     ? "bg-slate-900 text-white shadow-sm"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
