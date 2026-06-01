@@ -141,8 +141,10 @@ function DashboardEmptyState({ onOpenAddAssignment }: { onOpenAddAssignment: () 
 }
 
 function DashboardReadyState({
+  onOpenGrades,
   viewModel,
 }: {
+  onOpenGrades: () => void;
   viewModel: DashboardViewModel;
 }) {
   return (
@@ -160,7 +162,10 @@ function DashboardReadyState({
             dates={viewModel.calendarDays}
             schedule={viewModel.schedule}
           />
-          <CourseGrades />
+          <CourseGrades
+            onOpenGrades={onOpenGrades}
+            panel={viewModel.gradesPanel}
+          />
         </div>
       </div>
     </>
@@ -237,7 +242,12 @@ export function HomePage({
       return <DashboardErrorState error={error} onRetry={reload} />;
     }
 
-    return <DashboardReadyState viewModel={viewModel} />;
+    return (
+      <DashboardReadyState
+        onOpenGrades={() => setActiveView("grades")}
+        viewModel={viewModel}
+      />
+    );
   }, [error, handleOpenAddAssignment, reload, status, viewModel]);
 
   return (

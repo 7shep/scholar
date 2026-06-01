@@ -6,4 +6,5 @@
 - [x] Build a dedicated Grades page with summary cards, filters, course chips, and completed-assignment rows driven by real user data.
 - [x] Implement inline grade add/edit/save behavior for numeric and letter grades.
 - [x] Add loading, error, zero-data, and filtered-empty states for the Grades page.
+- [x] Replace the dashboard grades placeholder with a compact real-data grades panel linked to the full Grades page.
 - [x] Verify the renderer build and confirm the page compiles cleanly with the new grade model.

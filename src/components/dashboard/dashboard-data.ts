@@ -74,10 +74,26 @@ export type DashboardCalendarItem = {
   typeLabel: string;
 };
 
+export type DashboardCourseGradeItem = {
+  courseColor: string | null;
+  courseId: string;
+  courseName: string;
+  displayLabel: string;
+  letterGrade: string;
+  percentage: number;
+};
+
+export type DashboardGradesPanel = {
+  gradedCount: number;
+  items: DashboardCourseGradeItem[];
+  missingGradeCount: number;
+};
+
 export type DashboardViewModel = {
   assignments: DashboardAssignment[];
   calendarDays: DashboardCalendarDay[];
   focus: DashboardFocus | null;
+  gradesPanel: DashboardGradesPanel;
   schedule: DashboardCalendarItem[];
   stats: DashboardStats;
 };
@@ -238,6 +254,22 @@ const ACCEPTED_DOCUMENT_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
+
+const LETTER_GRADE_SCALE = [
+  { letter: "A+", max: 100, midpoint: 95, min: 90 },
+  { letter: "A", max: 89.9, midpoint: 87.45, min: 85 },
+  { letter: "A-", max: 84.9, midpoint: 82.45, min: 80 },
+  { letter: "B+", max: 79.9, midpoint: 78.45, min: 77 },
+  { letter: "B", max: 76.9, midpoint: 74.95, min: 73 },
+  { letter: "B-", max: 72.9, midpoint: 71.45, min: 70 },
+  { letter: "C+", max: 69.9, midpoint: 68.45, min: 67 },
+  { letter: "C", max: 66.9, midpoint: 64.95, min: 63 },
+  { letter: "C-", max: 62.9, midpoint: 61.45, min: 60 },
+  { letter: "D+", max: 59.9, midpoint: 58.45, min: 57 },
+  { letter: "D", max: 56.9, midpoint: 54.95, min: 53 },
+  { letter: "D-", max: 52.9, midpoint: 51.45, min: 50 },
+  { letter: "F", max: 49.9, midpoint: 24.95, min: 0 },
+] as const;
 
 function getErrorMessage(error: unknown) {
   if (isMissingAssignmentsGradeColumnsError(error)) {
@@ -435,6 +467,43 @@ function formatGradeValue(
   }
 
   return null;
+}
+
+function getGradePercentageFromAssignment(
+  assignment: Pick<
+    AssignmentRow,
+    "grade_letter" | "grade_number" | "grade_type"
+  >,
+) {
+  if (assignment.grade_type === "number") {
+    return normalizeGradeNumber(assignment.grade_number);
+  }
+
+  if (assignment.grade_type === "letter") {
+    const normalizedLetter = normalizeGradeLetter(assignment.grade_letter);
+
+    if (!normalizedLetter) {
+      return null;
+    }
+
+    return (
+      LETTER_GRADE_SCALE.find((entry) => entry.letter === normalizedLetter)
+        ?.midpoint ?? null
+    );
+  }
+
+  return null;
+}
+
+function getLetterGradeFromPercentage(percentage: number) {
+  const normalizedPercentage = Math.max(0, Math.min(100, percentage));
+
+  return (
+    LETTER_GRADE_SCALE.find(
+      (entry) =>
+        normalizedPercentage >= entry.min && normalizedPercentage <= entry.max,
+    )?.letter ?? "F"
+  );
 }
 
 function normalizeDifficulty(difficulty: string | null): DashboardDifficulty {
@@ -768,7 +837,12 @@ export function buildDashboardViewModel(
   assignments: AssignmentRow[],
 ) {
   const currentDate = new Date();
-  const courseNames = new Map(courses.map((course) => [course.id, course.name]));
+  const courseLookup = new Map(
+    courses.map((course) => [
+      course.id,
+      { color: course.color, name: course.name },
+    ]),
+  );
   const sortedAssignments = [...assignments].sort(compareAssignments);
   const openAssignments = sortedAssignments.filter(
     (assignment) => !isCompletedStatus(assignment.status),
@@ -783,7 +857,7 @@ export function buildDashboardViewModel(
       const difficulty = normalizeDifficulty(assignment.difficulty);
 
       return {
-        course: courseNames.get(assignment.course_id ?? "") ?? "Unassigned",
+        course: courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned",
         difficulty,
         difficultyClassName: getDifficultyClassName(difficulty),
         dueLabel: formatDueLabel(assignment.due_at),
@@ -811,25 +885,89 @@ export function buildDashboardViewModel(
       const date = new Date(assignment.due_at as string);
 
       return {
-        course: courseNames.get(assignment.course_id ?? "") ?? "Unassigned",
+        course: courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned",
         timeLabel: Number.isNaN(date.getTime()) ? "TBD" : formatTime(date),
         title: assignment.title,
         typeLabel: "Deadline",
       } satisfies DashboardCalendarItem;
     });
 
+  const gradedCompletedAssignments = completedAssignments.filter((assignment) =>
+    hasAssignmentGrade(assignment),
+  );
+  const courseGrades = courses
+    .map((course) => {
+      const gradedAssignments = gradedCompletedAssignments
+        .filter((assignment) => assignment.course_id === course.id)
+        .map((assignment) => ({
+          percentage: getGradePercentageFromAssignment(assignment),
+          weightPercent: normalizeWeightPercent(assignment.weight_percent),
+        }))
+        .filter(
+          (
+            assignment,
+          ): assignment is {
+            percentage: number;
+            weightPercent: number | null;
+          } => assignment.percentage != null,
+        );
+
+      if (gradedAssignments.length === 0) {
+        return null;
+      }
+
+      const shouldUseWeightedAverage = gradedAssignments.every(
+        (assignment) =>
+          assignment.weightPercent != null && assignment.weightPercent > 0,
+      );
+      const averagePercentage = shouldUseWeightedAverage
+        ? gradedAssignments.reduce(
+            (sum, assignment) =>
+              sum +
+              assignment.percentage * ((assignment.weightPercent ?? 0) / 100),
+            0,
+          ) /
+          gradedAssignments.reduce(
+            (sum, assignment) => sum + ((assignment.weightPercent ?? 0) / 100),
+            0,
+          )
+        : gradedAssignments.reduce(
+            (sum, assignment) => sum + assignment.percentage,
+            0,
+          ) / gradedAssignments.length;
+      const roundedPercentage = Math.round(averagePercentage);
+      const letterGrade = getLetterGradeFromPercentage(averagePercentage);
+
+      return {
+        courseColor: course.color,
+        courseId: course.id,
+        courseName: course.name,
+        displayLabel: `${letterGrade}, ${roundedPercentage}%`,
+        letterGrade,
+        percentage: roundedPercentage,
+      } satisfies DashboardCourseGradeItem;
+    })
+    .filter((course): course is DashboardCourseGradeItem => course != null);
+  const gradesPanel = {
+    gradedCount: gradedCompletedAssignments.length,
+    items: courseGrades,
+    missingGradeCount:
+      completedAssignments.length - gradedCompletedAssignments.length,
+  } satisfies DashboardGradesPanel;
+
   return {
     assignments: assignmentCards,
     calendarDays: buildCalendarDays(currentDate, assignments),
     focus: focusSource
       ? {
-          course: courseNames.get(focusSource.course_id ?? "") ?? "Unassigned",
+          course: courseLookup.get(focusSource.course_id ?? "")?.name ?? "Unassigned",
           difficulty: normalizeDifficulty(focusSource.difficulty),
           dueLabel: formatRelativeDueLabel(focusSource.due_at, currentDate),
           estimatedLabel: formatEstimatedLabel(focusSource.estimated_minutes),
           title: focusSource.title,
         }
       : null,
+    gradesPanel,
     schedule,
     stats: {
       activeCourses: courses.length,

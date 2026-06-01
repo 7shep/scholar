@@ -82,6 +82,31 @@ Suggested responsibilities:
    - graded rows show current value and an `Edit` action
    - ungraded rows show a `Needs grade` badge and inline entry controls
 
+## Dashboard Grades Panel
+
+The dashboard currently renders a placeholder `CourseGrades` card. Replace it with a real compact panel that reuses the shared grade data already loaded for the signed-in user.
+
+Suggested content:
+
+- title: `Course Grades`
+- `Details` action opening the full Grades page
+- one row per course with graded completed work
+- each row shows:
+  - course name
+  - computed course grade label such as `A, 94%`
+  - a horizontal progress bar using the course color
+- if no course has a computed grade yet, show an empty state
+- optionally mention how many completed assignments still need grades
+- a lightweight action that opens the full Grades page inside the existing shell
+
+Behavior:
+
+- if there are no completed assignments yet, show an empty state inside the card
+- convert letter grades into percentages using the midpoint of the configured range before computing course summaries
+- derive each course summary from the user's real graded completed assignments
+- keep this panel lightweight; it is a dashboard preview, not a duplicate of the full page
+- derive the panel view model in shared dashboard data code rather than fetching separately
+
 ## Inline Grade Entry
 
 Each editable row should support two modes:

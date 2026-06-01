@@ -11,6 +11,7 @@ Students need a focused page that uses their real completed assignments, makes m
 - Build a Grades page that only shows completed assignments and derives summary counts, filters, and course chips from the signed-in user's real data.
 - Support inline add, save, and edit behavior for assignment grades directly from the list.
 - Add loading, error, zero-data, and filtered-empty states for the Grades page.
+- Replace the deferred grades placeholder on the dashboard with a lightweight real-data grades panel.
 
 ## Non-Goals
 
