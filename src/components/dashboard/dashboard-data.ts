@@ -74,12 +74,14 @@ export type DashboardCalendarItem = {
   typeLabel: string;
 };
 
+export type DashboardLetterGrade = (typeof LETTER_GRADE_SCALE)[number]["letter"];
+
 export type DashboardCourseGradeItem = {
   courseColor: string | null;
   courseId: string;
   courseName: string;
   displayLabel: string;
-  letterGrade: string;
+  letterGrade: DashboardLetterGrade;
   percentage: number;
 };
 
