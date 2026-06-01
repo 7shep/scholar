@@ -35,6 +35,31 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>({
       return;
     }
 
+    const revealIfInView = () => {
+      const rect = node.getBoundingClientRect();
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight;
+      const viewportWidth =
+        window.innerWidth || document.documentElement.clientWidth;
+
+      const isVisible =
+        rect.bottom > 0 &&
+        rect.right > 0 &&
+        rect.top < viewportHeight &&
+        rect.left < viewportWidth;
+
+      if (isVisible) {
+        setVisible(true);
+      }
+
+      return isVisible;
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -50,6 +75,10 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>({
     );
 
     observer.observe(node);
+    if (revealIfInView() && once) {
+      observer.unobserve(node);
+    }
+
     return () => observer.disconnect();
   }, [threshold, rootMargin, once]);
 

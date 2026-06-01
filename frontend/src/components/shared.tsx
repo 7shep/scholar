@@ -42,7 +42,14 @@ export const gradeStandings = [
   { name: "World History", grade: "91%", barClass: "grade-track__fill--blue", width: "91%" },
 ];
 
-export const featureItems = [
+export type FeatureItem = {
+  icon: "refresh" | "tag" | "bar" | "calc" | "calendar";
+  title: string;
+  description: string;
+  wide?: boolean;
+};
+
+export const featureItems: FeatureItem[] = [
   {
     icon: "refresh",
     title: "Auto-Sync Assignments",
