@@ -1,7 +1,7 @@
 {
   "name": "school-organizer",
   "productName": "Scholar",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Desktop planner for courses, assignments, and grades.",
   "author": "7shep",
