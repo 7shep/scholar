@@ -1,4 +1,4 @@
-# school-organizer
+# Scholar
 
 Scholar is an Electron + React + TypeScript desktop app for organizing courses, assignments, and grades.
 
