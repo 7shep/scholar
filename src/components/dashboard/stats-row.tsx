@@ -58,7 +58,7 @@ export function StatsRow({ stats }: StatsRowProps) {
         className="animate-fade-in-up rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm"
         style={{ animationDelay: "120ms" }}
       >
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
+        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
           <ListTodo className="h-5 w-5 text-slate-700" />
         </div>
         <p className="text-sm font-medium text-slate-500">Open Assignments</p>
@@ -74,7 +74,7 @@ export function StatsRow({ stats }: StatsRowProps) {
         className="animate-fade-in-up rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm"
         style={{ animationDelay: "180ms" }}
       >
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
+        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50">
           <Clock3 className="h-5 w-5 text-slate-700" />
         </div>
         <p className="text-sm font-medium text-slate-500">Due This Week</p>
@@ -90,7 +90,7 @@ export function StatsRow({ stats }: StatsRowProps) {
         className="completion-rate-card animate-fade-in-up rounded-[1.75rem] border border-lime-300 bg-[#CCFF00] p-5 shadow-sm"
         style={{ animationDelay: "240ms" }}
       >
-        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/55">
+        <div className="mb-8 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/55">
           <CheckCircle2 className="h-5 w-5 text-slate-900" />
         </div>
         <p className="text-sm font-medium text-slate-800">Completion Rate</p>
