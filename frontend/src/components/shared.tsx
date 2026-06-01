@@ -1,4 +1,7 @@
-﻿import { Apple } from "lucide-react";
+import { Apple } from "lucide-react";
+
+const WINDOWS_DOWNLOAD_URL =
+  "https://github.com/7shep/scholar/releases/download/untagged-12b615e4be2073c6d149/Scholar-1.0.2-x64.exe";
 
 export type TaskItem = {
   title: string;
@@ -96,8 +99,15 @@ export function Brand({ className = "brand" }: { className?: string }) {
 }
 
 export function DownloadButton({ platform }: { platform: "macOS" | "Windows" }) {
+  const href = platform === "Windows" ? WINDOWS_DOWNLOAD_URL : "#";
+
   return (
-    <a className="download-btn" href="#" aria-label={`Download for ${platform}`}>
+    <a
+      className="download-btn"
+      href={href}
+      aria-label={`Download for ${platform}`}
+      download={platform === "Windows" ? "" : undefined}
+    >
       <span className="download-btn__icon" aria-hidden="true">
         {platform === "macOS" ? <Apple size={18} /> : <span className="windows-glyph" />}
       </span>
