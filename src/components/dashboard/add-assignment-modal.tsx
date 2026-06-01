@@ -43,7 +43,6 @@ type ModalStep =
   | "syllabus-review";
 
 type ManualFormState = {
-  difficulty: string;
   dueAt: string;
   estimatedMinutes: string;
   title: string;
@@ -68,7 +67,6 @@ type EditableCandidate = {
 
 const NEW_COURSE_VALUE = "__new_course__";
 const INITIAL_MANUAL_FORM: ManualFormState = {
-  difficulty: "",
   dueAt: "",
   estimatedMinutes: "",
   title: "",
@@ -355,7 +353,6 @@ export function AddAssignmentModal({
 
       await createAssignment({
         courseId,
-        difficulty: manualForm.difficulty,
         dueAt: toIsoDateTime(manualForm.dueAt),
         estimatedMinutes: manualForm.estimatedMinutes
           ? Number(manualForm.estimatedMinutes)
@@ -677,22 +674,6 @@ export function AddAssignmentModal({
         </div>
 
         <div>
-          <FieldLabel>Difficulty</FieldLabel>
-          <select
-            value={manualForm.difficulty}
-            onChange={(event) =>
-              handleManualFormChange("difficulty", event.target.value)
-            }
-            className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
-          >
-            <option value="">Unspecified</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-        </div>
-
-        <div className="md:col-span-2">
           <FieldLabel>Estimated minutes</FieldLabel>
           <input
             type="number"
@@ -707,7 +688,7 @@ export function AddAssignmentModal({
           />
         </div>
 
-        <div className="md:col-span-2">
+        <div>
           <FieldLabel>Weight (%)</FieldLabel>
           <input
             type="number"
@@ -730,7 +711,7 @@ export function AddAssignmentModal({
             This saves directly to {currentCourseName || "your course"}.
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            You can come back later to mark it complete or edit the details.
+            Priority will be derived automatically from the assignment weight.
           </p>
         </div>
         <CalendarDays className="h-5 w-5 shrink-0 text-slate-400" />

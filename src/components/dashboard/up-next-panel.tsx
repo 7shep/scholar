@@ -63,9 +63,9 @@ export function UpNextPanel({ assignments }: UpNextPanelProps) {
             </div>
 
             <span
-              className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold ${assignment.difficultyClassName}`}
+              className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-bold ${assignment.priorityClassName}`}
             >
-              {assignment.difficulty}
+              {assignment.priority}
             </span>
           </div>
         ))}

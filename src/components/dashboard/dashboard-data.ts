@@ -35,12 +35,12 @@ export type AssignmentRow = {
 
 export type DashboardStatus = "loading" | "error" | "empty" | "ready";
 
-export type DashboardDifficulty = "Easy" | "Medium" | "Hard" | "Unspecified";
+export type DashboardPriority = "High" | "Low" | "Medium" | "Unspecified";
 
 export type DashboardAssignment = {
   course: string;
-  difficulty: DashboardDifficulty;
-  difficultyClassName: string;
+  priority: DashboardPriority;
+  priorityClassName: string;
   dueLabel: string;
   id: string;
   title: string;
@@ -58,9 +58,9 @@ export type DashboardStats = {
 
 export type DashboardFocus = {
   course: string;
-  difficulty: DashboardDifficulty;
+  priority: DashboardPriority;
   dueLabel: string;
-  estimatedLabel: string;
+  estimatedLabel: string | null;
   title: string;
 };
 
@@ -183,7 +183,6 @@ export type UploadCourseDocumentInput = {
 
 export type CreateAssignmentInput = {
   courseId: string;
-  difficulty?: string | null;
   dueAt?: string | null;
   estimatedMinutes?: number | null;
   title: string;
@@ -609,31 +608,33 @@ function getTimestampValue(value: string | null | undefined) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-function normalizeDifficulty(difficulty: string | null): DashboardDifficulty {
-  const normalized = difficulty?.trim().toLowerCase();
+function getPriorityFromWeightPercent(
+  weightPercent: number | null | undefined,
+): DashboardPriority {
+  const normalizedWeight = normalizeWeightPercent(weightPercent);
 
-  if (normalized === "easy") {
-    return "Easy";
+  if (normalizedWeight == null || normalizedWeight <= 0) {
+    return "Unspecified";
   }
 
-  if (normalized === "medium") {
+  if (normalizedWeight >= 30) {
+    return "High";
+  }
+
+  if (normalizedWeight >= 15) {
     return "Medium";
   }
 
-  if (normalized === "hard") {
-    return "Hard";
-  }
-
-  return "Unspecified";
+  return "Low";
 }
 
-function getDifficultyClassName(difficulty: DashboardDifficulty) {
-  switch (difficulty) {
-    case "Easy":
+function getPriorityClassName(priority: DashboardPriority) {
+  switch (priority) {
+    case "Low":
       return "bg-emerald-100 text-emerald-700";
     case "Medium":
       return "bg-amber-100 text-amber-700";
-    case "Hard":
+    case "High":
       return "bg-rose-100 text-rose-700";
     default:
       return "bg-slate-100 text-slate-600";
@@ -744,7 +745,7 @@ function formatRelativeDueLabel(dueAt: string | null, currentDate: Date) {
 
 function formatEstimatedLabel(estimatedMinutes: number | null) {
   if (!estimatedMinutes || estimatedMinutes <= 0) {
-    return "No time estimate";
+    return null;
   }
 
   if (estimatedMinutes < 60) {
@@ -1059,12 +1060,12 @@ export function buildDashboardViewModel(
   const assignmentCards = openAssignments
     .slice(0, MAX_UP_NEXT_ASSIGNMENTS)
     .map((assignment) => {
-      const difficulty = normalizeDifficulty(assignment.difficulty);
+      const priority = getPriorityFromWeightPercent(assignment.weight_percent);
 
       return {
         course: courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned",
-        difficulty,
-        difficultyClassName: getDifficultyClassName(difficulty),
+        priority,
+        priorityClassName: getPriorityClassName(priority),
         dueLabel: formatDueLabel(assignment.due_at),
         id: assignment.id,
         title: assignment.title,
@@ -1133,7 +1134,7 @@ export function buildDashboardViewModel(
     focus: focusSource
       ? {
           course: courseLookup.get(focusSource.course_id ?? "")?.name ?? "Unassigned",
-          difficulty: normalizeDifficulty(focusSource.difficulty),
+          priority: getPriorityFromWeightPercent(focusSource.weight_percent),
           dueLabel: formatRelativeDueLabel(focusSource.due_at, currentDate),
           estimatedLabel: formatEstimatedLabel(focusSource.estimated_minutes),
           title: focusSource.title,
@@ -1677,7 +1678,6 @@ export async function createAssignment(input: CreateAssignmentInput) {
     .from("assignments")
     .insert({
       course_id: input.courseId,
-      difficulty: normalizeOptionalText(input.difficulty)?.toLowerCase(),
       due_at: input.dueAt ?? null,
       estimated_minutes: normalizeEstimatedMinutes(input.estimatedMinutes),
       status: "todo",
@@ -1715,7 +1715,6 @@ export async function bulkCreateAssignments(inputs: CreateAssignmentInput[]) {
 
     return {
       course_id: input.courseId,
-      difficulty: normalizeOptionalText(input.difficulty)?.toLowerCase(),
       due_at: input.dueAt ?? null,
       estimated_minutes: normalizeEstimatedMinutes(input.estimatedMinutes),
       status: "todo",

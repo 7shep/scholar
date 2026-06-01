@@ -123,7 +123,19 @@ function DashboardEmptyState({ onOpenAddAssignment }: { onOpenAddAssignment: () 
         </div>
       </div>
 
-    
+      <div className="mt-6 flex flex-wrap items-center gap-4 rounded-[1.25rem] border border-dashed border-slate-300 bg-slate-50 p-4">
+        <p className="text-sm text-slate-500">
+          The add flow lets you choose between one manual assignment or a
+          syllabus import with a review step.
+        </p>
+        {/* <button
+          type="button"
+          onClick={onOpenAddAssignment}
+          className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+        >
+          Add Assignment
+        </button> */}
+      </div>
     </section>
   );
 }
@@ -251,7 +263,10 @@ export function HomePage({
 
           <div className="flex min-h-screen min-w-0 flex-1 flex-col">
             {activeView === "dashboard" ? (
-              <TopBar displayName={displayName} />
+              <TopBar
+                displayName={displayName}
+                onQuickAdd={handleOpenAddAssignment}
+              />
             ) : null}
 
             <div className="flex-1 px-4 pb-8 pt-6 sm:px-6 lg:px-8">

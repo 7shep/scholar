@@ -39,11 +39,13 @@ export function FocusCard({ focus }: FocusCardProps) {
                 <Clock className="h-4 w-4" />
                 {focus.dueLabel}
               </span>
+              {focus.estimatedLabel ? (
+                <span className="rounded-full border border-slate-700 px-3 py-1.5">
+                  {focus.estimatedLabel}
+                </span>
+              ) : null}
               <span className="rounded-full border border-slate-700 px-3 py-1.5">
-                {focus.estimatedLabel}
-              </span>
-              <span className="rounded-full border border-slate-700 px-3 py-1.5">
-                {focus.difficulty}
+                {focus.priority} priority
               </span>
             </div>
           </>
