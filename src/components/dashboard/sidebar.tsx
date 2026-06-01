@@ -24,7 +24,6 @@ const navigationItems = [
   { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
   { icon: CheckSquare, label: "Assignments", view: "assignments" },
   { icon: BarChart3, label: "Grades", view: "grades" },
-  { icon: Calendar, label: "Calendar" },
 ] as const;
 
 export function Sidebar({
@@ -93,13 +92,13 @@ export function Sidebar({
 
         <div className="mt-auto border-t border-slate-100 p-4 sm:p-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            <button
+            {/* <button
               type="button"
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
             >
               <Settings className="h-4 w-4" />
               Settings
-            </button>
+            </button> */}
 
             <button
               type="button"
