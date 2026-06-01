@@ -5,6 +5,7 @@ create table if not exists public.courses (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   color text,
+  credits integer not null default 3 check (credits in (3, 6)),
   term text,
   created_at timestamptz not null default now()
 );
@@ -21,8 +22,39 @@ create table if not exists public.assignments (
   weight_percent numeric(5, 2) check (
     weight_percent is null or (weight_percent >= 0 and weight_percent <= 100)
   ),
+  completed_at timestamptz,
+  grade_type text check (grade_type is null or grade_type in ('number', 'letter')),
+  grade_number numeric(6, 2) check (grade_number is null or grade_number >= 0),
+  grade_letter text,
+  grade_updated_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'assignments_grade_value_consistency_check'
+  ) then
+    alter table public.assignments
+    add constraint assignments_grade_value_consistency_check check (
+      (
+        grade_type is null and
+        grade_number is null and
+        grade_letter is null
+      ) or (
+        grade_type = 'number' and
+        grade_number is not null and
+        grade_letter is null
+      ) or (
+        grade_type = 'letter' and
+        grade_letter is not null and
+        grade_number is null
+      )
+    );
+  end if;
+end $$;
 
 create table if not exists public.course_documents (
   id uuid primary key default gen_random_uuid(),
@@ -211,8 +243,8 @@ from auth.users
 order by created_at desc;
 
 -- Replace YOUR_USER_ID_HERE and COURSE_ID_HERE before running these seed inserts.
-insert into public.courses (user_id, name, color, term)
-values ('YOUR_USER_ID_HERE', 'Biology 101', '#22c55e', 'Fall 2026');
+insert into public.courses (user_id, name, color, credits, term)
+values ('YOUR_USER_ID_HERE', 'Biology 101', '#22c55e', 3, 'Fall 2026');
 
 insert into public.assignments (
   user_id,

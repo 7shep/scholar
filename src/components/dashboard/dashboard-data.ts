@@ -7,6 +7,7 @@ import { debugLog, debugTable } from "@/lib/debug-log";
 
 export type CourseRow = {
   color: string | null;
+  credits: number;
   created_at: string | null;
   id: string;
   name: string;
@@ -24,6 +25,7 @@ export type AssignmentRow = {
   grade_letter: string | null;
   grade_number: number | null;
   grade_type: "letter" | "number" | null;
+  grade_updated_at: string | null;
   id: string;
   status: string | null;
   title: string;
@@ -48,7 +50,9 @@ export type DashboardStats = {
   activeCourses: number;
   completedAssignments: number;
   completionRate: number;
+  currentGpa: number | null;
   dueThisWeek: number;
+  gpaDelta: number | null;
   openAssignments: number;
 };
 
@@ -164,6 +168,7 @@ export type AssignmentsViewModel = {
 
 export type CreateCourseInput = {
   color?: string | null;
+  credits: number;
   name: string;
   term?: string | null;
   userId: string;
@@ -250,8 +255,10 @@ const MAX_UP_NEXT_ASSIGNMENTS = 5;
 const MAX_SCHEDULE_ITEMS = 4;
 const WEEK_LENGTH = 7;
 const COURSE_DOCUMENTS_BUCKET = "course-documents";
+const DEFAULT_COURSE_CREDITS = 3;
+const TWO_SEMESTER_COURSE_CREDITS = 6;
 const ASSIGNMENT_SELECT_COLUMNS =
-  "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, completed_at, grade_type, grade_number, grade_letter, created_at";
+  "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, completed_at, grade_type, grade_number, grade_letter, grade_updated_at, created_at";
 const ACCEPTED_DOCUMENT_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -273,13 +280,42 @@ const LETTER_GRADE_SCALE = [
   { letter: "F", max: 49.9, midpoint: 24.95, min: 0 },
 ] as const;
 
+const GPA_POINTS_BY_LETTER_GRADE: Record<DashboardLetterGrade, number> = {
+  "A+": 4,
+  A: 4,
+  "A-": 3.7,
+  "B+": 3.3,
+  B: 3,
+  "B-": 2.7,
+  "C+": 2.3,
+  C: 2,
+  "C-": 1.7,
+  "D+": 1.3,
+  D: 1,
+  "D-": 0.7,
+  F: 0,
+};
+
+type CourseGradeSummary = DashboardCourseGradeItem & {
+  credits: number;
+  gpaPoints: number;
+};
+
 function getErrorMessage(error: unknown) {
   if (isMissingAssignmentsGradeColumnsError(error)) {
     return getMissingAssignmentsGradeColumnsMessage();
   }
 
+  if (isMissingAssignmentsGradeUpdatedAtColumnError(error)) {
+    return getMissingCourseCreditsAndGradeUpdatedAtMessage();
+  }
+
   if (isMissingAssignmentsWeightColumnError(error)) {
     return getMissingAssignmentsWeightColumnMessage();
+  }
+
+  if (isMissingCoursesCreditsColumnError(error)) {
+    return getMissingCourseCreditsAndGradeUpdatedAtMessage();
   }
 
   if (error instanceof Error) {
@@ -334,6 +370,12 @@ function normalizeWeightPercent(value: number | null | undefined) {
   }
 
   return Math.min(100, Math.round(value * 10) / 10);
+}
+
+function normalizeCourseCredits(value: number | null | undefined) {
+  return value === TWO_SEMESTER_COURSE_CREDITS
+    ? TWO_SEMESTER_COURSE_CREDITS
+    : DEFAULT_COURSE_CREDITS;
 }
 
 function normalizeGradeNumber(value: number | null | undefined) {
@@ -392,6 +434,25 @@ function isMissingAssignmentsWeightColumnError(error: unknown) {
   );
 }
 
+function isMissingCoursesCreditsColumnError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const { details, hint, message } = error as SupabaseLikeError;
+  const combinedText = [message, details, hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    combinedText.includes("credits") &&
+    (combinedText.includes("schema cache") ||
+      combinedText.includes("column") ||
+      combinedText.includes("does not exist"))
+  );
+}
+
 function isMissingAssignmentsGradeColumnsError(error: unknown) {
   if (!error || typeof error !== "object") {
     return false;
@@ -417,12 +478,35 @@ function isMissingAssignmentsGradeColumnsError(error: unknown) {
   );
 }
 
+function isMissingAssignmentsGradeUpdatedAtColumnError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const { details, hint, message } = error as SupabaseLikeError;
+  const combinedText = [message, details, hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    combinedText.includes("grade_updated_at") &&
+    (combinedText.includes("schema cache") ||
+      combinedText.includes("column") ||
+      combinedText.includes("does not exist"))
+  );
+}
+
 function getMissingAssignmentsWeightColumnMessage() {
   return "Your database is missing the new assignments weight column. Run the SQL in docs/supabase-add-weight-percent.sql, then try again.";
 }
 
 function getMissingAssignmentsGradeColumnsMessage() {
   return "Your database is missing the new assignments grade columns. Run the SQL in docs/supabase-add-grades-columns.sql, then try again.";
+}
+
+function getMissingCourseCreditsAndGradeUpdatedAtMessage() {
+  return "Your database is missing the new course credits or grade update tracking columns. Run the SQL in docs/supabase-add-course-credits-and-grade-updated-at.sql, then try again.";
 }
 
 function isCompletedStatus(status: string | null) {
@@ -506,6 +590,23 @@ function getLetterGradeFromPercentage(percentage: number) {
         normalizedPercentage >= entry.min && normalizedPercentage <= entry.max,
     )?.letter ?? "F"
   );
+}
+
+function getGpaPointsFromLetterGrade(letterGrade: DashboardLetterGrade) {
+  return GPA_POINTS_BY_LETTER_GRADE[letterGrade];
+}
+
+function roundToTwoDecimals(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function getTimestampValue(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 function normalizeDifficulty(difficulty: string | null): DashboardDifficulty {
@@ -805,6 +906,108 @@ function compareCompletedAssignments(left: AssignmentRow, right: AssignmentRow) 
   return getAssignmentCompletedSortTime(right) - getAssignmentCompletedSortTime(left);
 }
 
+function buildCourseGradeSummaries(
+  courses: CourseRow[],
+  assignments: AssignmentRow[],
+): CourseGradeSummary[] {
+  const gradedCompletedAssignments = assignments.filter(
+    (assignment) =>
+      isCompletedStatus(assignment.status) && hasAssignmentGrade(assignment),
+  );
+
+  return courses
+    .map((course) => {
+      const gradedAssignments = gradedCompletedAssignments
+        .filter((assignment) => assignment.course_id === course.id)
+        .map((assignment) => ({
+          percentage: getGradePercentageFromAssignment(assignment),
+          weightPercent: normalizeWeightPercent(assignment.weight_percent),
+        }))
+        .filter(
+          (
+            assignment,
+          ): assignment is {
+            percentage: number;
+            weightPercent: number | null;
+          } => assignment.percentage != null,
+        );
+
+      if (gradedAssignments.length === 0) {
+        return null;
+      }
+
+      const shouldUseWeightedAverage = gradedAssignments.every(
+        (assignment) =>
+          assignment.weightPercent != null && assignment.weightPercent > 0,
+      );
+      const averagePercentage = shouldUseWeightedAverage
+        ? gradedAssignments.reduce(
+            (sum, assignment) =>
+              sum +
+              assignment.percentage * ((assignment.weightPercent ?? 0) / 100),
+            0,
+          ) /
+          gradedAssignments.reduce(
+            (sum, assignment) => sum + ((assignment.weightPercent ?? 0) / 100),
+            0,
+          )
+        : gradedAssignments.reduce(
+            (sum, assignment) => sum + assignment.percentage,
+            0,
+          ) / gradedAssignments.length;
+      const roundedPercentage = Math.round(averagePercentage);
+      const letterGrade = getLetterGradeFromPercentage(averagePercentage);
+
+      return {
+        courseColor: course.color,
+        courseId: course.id,
+        courseName: course.name,
+        credits: normalizeCourseCredits(course.credits),
+        displayLabel: `${letterGrade}, ${roundedPercentage}%`,
+        gpaPoints: getGpaPointsFromLetterGrade(letterGrade),
+        letterGrade,
+        percentage: roundedPercentage,
+      } satisfies CourseGradeSummary;
+    })
+    .filter((course): course is CourseGradeSummary => course != null);
+}
+
+function calculateWeightedGpa(courseGrades: CourseGradeSummary[]) {
+  if (courseGrades.length === 0) {
+    return null;
+  }
+
+  const totalCredits = courseGrades.reduce(
+    (sum, course) => sum + normalizeCourseCredits(course.credits),
+    0,
+  );
+
+  if (totalCredits <= 0) {
+    return null;
+  }
+
+  return roundToTwoDecimals(
+    courseGrades.reduce(
+      (sum, course) =>
+        sum + getGpaPointsFromLetterGrade(course.letterGrade) * course.credits,
+      0,
+    ) / totalCredits,
+  );
+}
+
+function getLatestGradeUpdateTimestamp(assignments: AssignmentRow[]) {
+  const timestamps = assignments
+    .filter((assignment) => hasAssignmentGrade(assignment))
+    .map((assignment) => getTimestampValue(assignment.grade_updated_at))
+    .filter((timestamp): timestamp is number => timestamp != null);
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return Math.max(...timestamps);
+}
+
 function buildCalendarDays(
   currentDate: Date,
   assignments: AssignmentRow[],
@@ -897,59 +1100,26 @@ export function buildDashboardViewModel(
   const gradedCompletedAssignments = completedAssignments.filter((assignment) =>
     hasAssignmentGrade(assignment),
   );
-  const courseGrades = courses
-    .map((course) => {
-      const gradedAssignments = gradedCompletedAssignments
-        .filter((assignment) => assignment.course_id === course.id)
-        .map((assignment) => ({
-          percentage: getGradePercentageFromAssignment(assignment),
-          weightPercent: normalizeWeightPercent(assignment.weight_percent),
-        }))
-        .filter(
-          (
-            assignment,
-          ): assignment is {
-            percentage: number;
-            weightPercent: number | null;
-          } => assignment.percentage != null,
+  const courseGrades = buildCourseGradeSummaries(courses, assignments);
+  const currentGpa = calculateWeightedGpa(courseGrades);
+  const latestGradeUpdateTimestamp = getLatestGradeUpdateTimestamp(assignments);
+  const previousGpa =
+    latestGradeUpdateTimestamp == null
+      ? null
+      : calculateWeightedGpa(
+          buildCourseGradeSummaries(
+            courses,
+            assignments.filter(
+              (assignment) =>
+                getTimestampValue(assignment.grade_updated_at) !==
+                latestGradeUpdateTimestamp,
+            ),
+          ),
         );
-
-      if (gradedAssignments.length === 0) {
-        return null;
-      }
-
-      const shouldUseWeightedAverage = gradedAssignments.every(
-        (assignment) =>
-          assignment.weightPercent != null && assignment.weightPercent > 0,
-      );
-      const averagePercentage = shouldUseWeightedAverage
-        ? gradedAssignments.reduce(
-            (sum, assignment) =>
-              sum +
-              assignment.percentage * ((assignment.weightPercent ?? 0) / 100),
-            0,
-          ) /
-          gradedAssignments.reduce(
-            (sum, assignment) => sum + ((assignment.weightPercent ?? 0) / 100),
-            0,
-          )
-        : gradedAssignments.reduce(
-            (sum, assignment) => sum + assignment.percentage,
-            0,
-          ) / gradedAssignments.length;
-      const roundedPercentage = Math.round(averagePercentage);
-      const letterGrade = getLetterGradeFromPercentage(averagePercentage);
-
-      return {
-        courseColor: course.color,
-        courseId: course.id,
-        courseName: course.name,
-        displayLabel: `${letterGrade}, ${roundedPercentage}%`,
-        letterGrade,
-        percentage: roundedPercentage,
-      } satisfies DashboardCourseGradeItem;
-    })
-    .filter((course): course is DashboardCourseGradeItem => course != null);
+  const gpaDelta =
+    currentGpa != null && previousGpa != null
+      ? roundToTwoDecimals(currentGpa - previousGpa)
+      : null;
   const gradesPanel = {
     gradedCount: gradedCompletedAssignments.length,
     items: courseGrades,
@@ -978,7 +1148,10 @@ export function buildDashboardViewModel(
         assignments.length === 0
           ? 0
           : Math.round((completedAssignments.length / assignments.length) * 100),
+      currentGpa,
       dueThisWeek,
+      gpaDelta:
+        gpaDelta != null && Object.is(gpaDelta, -0) ? 0 : gpaDelta,
       openAssignments: openAssignments.length,
     },
   } satisfies DashboardViewModel;
@@ -1351,7 +1524,7 @@ async function loadAcademicData(userId: string) {
   const [coursesResult, assignmentsResult] = await Promise.all([
     supabase
       .from("courses")
-      .select("id, user_id, name, color, term, created_at")
+      .select("id, user_id, name, color, term, credits, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: true }),
     supabase
@@ -1375,6 +1548,10 @@ async function loadAcademicData(userId: string) {
       return [] as CourseRow[];
     }
 
+    if (isMissingCoursesCreditsColumnError(coursesResult.error)) {
+      throw new Error(getMissingCourseCreditsAndGradeUpdatedAtMessage());
+    }
+
     throw coursesResult.error;
   })();
 
@@ -1385,6 +1562,10 @@ async function loadAcademicData(userId: string) {
 
     if (isMissingAssignmentsGradeColumnsError(assignmentsResult.error)) {
       throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
+    if (isMissingAssignmentsGradeUpdatedAtColumnError(assignmentsResult.error)) {
+      throw new Error(getMissingCourseCreditsAndGradeUpdatedAtMessage());
     }
 
     if (isMissingDashboardTableError(assignmentsResult.error)) {
@@ -1420,14 +1601,19 @@ export async function createCourse(input: CreateCourseInput) {
     .from("courses")
     .insert({
       color: normalizeOptionalText(input.color),
+      credits: normalizeCourseCredits(input.credits),
       name: input.name.trim(),
       term: normalizeOptionalText(input.term),
       user_id: input.userId,
     })
-    .select("id, user_id, name, color, term, created_at")
+    .select("id, user_id, name, color, term, credits, created_at")
     .single();
 
   if (error) {
+    if (isMissingCoursesCreditsColumnError(error)) {
+      throw new Error(getMissingCourseCreditsAndGradeUpdatedAtMessage());
+    }
+
     throw error;
   }
 
@@ -1627,6 +1813,7 @@ export async function updateAssignmentGrade(
       grade_letter: nextGradeLetter,
       grade_number: nextGradeNumber,
       grade_type: nextGradeType,
+      grade_updated_at: new Date().toISOString(),
     })
     .eq("id", input.assignmentId)
     .select(ASSIGNMENT_SELECT_COLUMNS)
@@ -1635,6 +1822,10 @@ export async function updateAssignmentGrade(
   if (error) {
     if (isMissingAssignmentsGradeColumnsError(error)) {
       throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
+    if (isMissingAssignmentsGradeUpdatedAtColumnError(error)) {
+      throw new Error(getMissingCourseCreditsAndGradeUpdatedAtMessage());
     }
 
     throw error;
@@ -1660,7 +1851,7 @@ export function useDashboardData(userId: string): DashboardDataResult {
     try {
       const nextResult = await loadDashboardViewModel(userId);
       const hasAnyData =
-        nextResult.viewModel.stats.activeCourses > 0 ||
+        nextResult.rawCourses.length > 0 ||
         nextResult.viewModel.stats.openAssignments > 0 ||
         nextResult.viewModel.stats.completedAssignments > 0;
 

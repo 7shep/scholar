@@ -52,6 +52,7 @@ type ManualFormState = {
 
 type CourseFormState = {
   color: string;
+  isTwoSemesterCourse: boolean;
   name: string;
   term: string;
 };
@@ -75,6 +76,7 @@ const INITIAL_MANUAL_FORM: ManualFormState = {
 };
 const INITIAL_COURSE_FORM: CourseFormState = {
   color: "#CCFF00",
+  isTwoSemesterCourse: false,
   name: "",
   term: "",
 };
@@ -244,7 +246,10 @@ export function AddAssignmentModal({
   }, [onClose]);
 
   const handleCourseFormChange = React.useCallback(
-    (field: keyof CourseFormState, value: string) => {
+    (
+      field: keyof CourseFormState,
+      value: string | boolean,
+    ) => {
       setCourseForm((current) => ({
         ...current,
         [field]: value,
@@ -286,6 +291,7 @@ export function AddAssignmentModal({
 
     const createdCourse = await createCourse({
       color: courseForm.color,
+      credits: courseForm.isTwoSemesterCourse ? 6 : 3,
       name: courseForm.name,
       term: courseForm.term,
       userId,
@@ -298,6 +304,7 @@ export function AddAssignmentModal({
     return createdCourse.id;
   }, [
     courseForm.color,
+    courseForm.isTwoSemesterCourse,
     courseForm.name,
     courseForm.term,
     onDataChanged,
@@ -563,6 +570,31 @@ export function AddAssignmentModal({
                 className="w-full border-0 p-0 text-sm text-slate-900 outline-none"
               />
             </div>
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+              <input
+                type="checkbox"
+                checked={courseForm.isTwoSemesterCourse}
+                onChange={(event) =>
+                  handleCourseFormChange(
+                    "isTwoSemesterCourse",
+                    event.target.checked,
+                  )
+                }
+                className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-lime-300"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  2 Semester Course (ex: MATH110A, MATH110B)
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Checked courses are saved as 6 credits. Unchecked courses are
+                  saved as 3 credits.
+                </p>
+              </div>
+            </label>
           </div>
         </div>
       ) : null}
