@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Chrome, GraduationCap } from "lucide-react";
+import { Chrome } from "lucide-react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
 
@@ -48,6 +48,7 @@ export function SignIn({
 
   return (
     <AuthShell
+      centerCardHeader
       eyebrow="Welcome back"
       title="Sign in"
       mobileTitle="Organize the semester from one home base."
@@ -55,10 +56,9 @@ export function SignIn({
       heroDescription="Scan course plans, track progress, and sync the semester without losing your weekends to scattered tabs."
       heroImageAlt="Student workspace"
       heroImageUrl="https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=1200&q=80"
-      cardIcon={<GraduationCap className="h-6 w-6 text-white" />}
     >
-      <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4 text-center">
+        <label className="flex flex-col items-center gap-2">
           <span className="text-sm text-slate-300">Email</span>
           <input
             placeholder="you@school.edu"
@@ -73,7 +73,7 @@ export function SignIn({
           />
         </label>
 
-        <label className="flex flex-col gap-2">
+        <label className="flex flex-col items-center gap-2">
           <span className="text-sm text-slate-300">Password</span>
           <input
             placeholder="Enter your password"

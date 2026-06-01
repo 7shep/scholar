@@ -2,17 +2,15 @@
 
 import {
   BarChart3,
-  BookOpen,
-  Calendar,
   CheckSquare,
   ChevronDown,
   LayoutDashboard,
   LogOut,
   Moon,
-  Settings,
   Sun,
 } from "lucide-react";
 
+import { ScholarMark } from "@/components/brand/scholar-mark";
 import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
 
 type SidebarProps = {
@@ -47,9 +45,7 @@ export function Sidebar({
         <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between gap-3 lg:flex-col lg:items-start">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-[#0BA13C] p-2 text-white shadow-sm">
-                <BookOpen className="h-5 w-5" />
-              </div>
+              <ScholarMark />
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-slate-900">
                   Scholar, by Alex

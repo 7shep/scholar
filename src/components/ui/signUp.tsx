@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Chrome, Rocket } from "lucide-react";
+import { Chrome } from "lucide-react";
 
 import { AuthShell } from "@/components/ui/auth-shell";
 
@@ -71,7 +71,6 @@ export function SignUp({
       heroDescription="Create your account once, then bring courses, assignments, and calendar plans into one focused flow."
       heroImageAlt="Student planning a semester"
       heroImageUrl="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80"
-      cardIcon={<Rocket className="h-6 w-6 text-white" />}
     >
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-2">

@@ -5,12 +5,14 @@ import { loadWindowState, saveWindowState } from './window-state';
 function createWindow(): void {
   const windowState = loadWindowState();
   const win = new BrowserWindow({
+    title: 'Scholar',
     autoHideMenuBar: true,
     width: windowState.width,
     height: windowState.height,
     x: windowState.x,
     y: windowState.y,
     backgroundColor: '#0f172a',
+    icon: path.join(__dirname, '..', '..', 'public', 'scholar-logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -58,6 +60,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  app.setName('Scholar');
   createWindow();
 
   app.on('activate', () => {

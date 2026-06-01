@@ -1,17 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { GraduationCap } from "lucide-react";
 
-const communityPhotos = [
-  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80",
-  "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80",
-  "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=120&q=80",
-  "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=120&q=80",
-] as const;
+import { ScholarMark } from "@/components/brand/scholar-mark";
 
 type AuthShellProps = {
   cardIcon?: React.ReactNode;
+  centerCardHeader?: boolean;
   children: React.ReactNode;
   eyebrow: string;
   heroDescription: string;
@@ -24,6 +19,7 @@ type AuthShellProps = {
 
 export function AuthShell({
   cardIcon,
+  centerCardHeader = false,
   children,
   eyebrow,
   heroDescription,
@@ -50,15 +46,13 @@ export function AuthShell({
           />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,6,23,0.32),rgba(2,6,23,0.88))]" />
           <div className="relative z-10 flex items-center gap-3 text-white">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 ring-1 ring-inset ring-cyan-300/40">
-              <GraduationCap className="h-6 w-6 text-cyan-200" />
-            </div>
+            <ScholarMark
+              className="rounded-2xl bg-[#0BA13C] p-3 text-white shadow-sm"
+              iconClassName="h-6 w-6"
+            />
             <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-200/80">
-                Academic OS
-              </p>
-              <p className="text-sm text-slate-200/80">
-                A calmer command center for school.
+              <p className="text-lg font-semibold tracking-tight text-white">
+                Scholar
               </p>
             </div>
           </div>
@@ -74,37 +68,19 @@ export function AuthShell({
               {heroDescription}
             </p>
           </div>
-
-          <div className="relative z-10 flex items-center justify-between rounded-3xl border border-white/10 bg-slate-950/35 p-5">
-            <div>
-              <p className="text-sm text-slate-300">
-                Students already organizing smarter
-              </p>
-              <p className="mt-2 text-3xl font-semibold text-white">12,000+</p>
-            </div>
-            <div className="flex">
-              {communityPhotos.map((photo, index) => (
-                <img
-                  key={photo}
-                  src={photo}
-                  alt="Community member"
-                  className={`h-12 w-12 rounded-full border-2 border-slate-950 object-cover ${
-                    index > 0 ? "-ml-3" : ""
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
         </section>
 
         <section className="relative flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-16">
           <div className="w-full max-w-md">
             <div className="mb-8 lg:hidden">
-              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-400/15 ring-1 ring-inset ring-cyan-300/40">
-                <GraduationCap className="h-7 w-7 text-cyan-200" />
+              <div className="mb-5">
+                <ScholarMark
+                  className="rounded-2xl bg-[#0BA13C] p-3 text-white shadow-sm"
+                  iconClassName="h-8 w-8"
+                />
               </div>
-              <p className="text-sm uppercase tracking-[0.28em] text-cyan-200/80">
-                Academic OS
+              <p className="text-lg font-semibold tracking-tight text-white">
+                Scholar
               </p>
               <h1 className="mt-3 text-3xl font-semibold text-white">
                 {mobileTitle}
@@ -112,7 +88,11 @@ export function AuthShell({
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-gradient-to-b from-white/14 to-white/5 p-8 shadow-2xl">
-              <div className="mb-6 flex items-center justify-between">
+              <div
+                className={`mb-6 flex items-center gap-4 ${
+                  centerCardHeader ? "flex-col text-center" : "justify-between"
+                }`}
+              >
                 <div>
                   <p className="text-sm uppercase tracking-[0.25em] text-cyan-200/75">
                     {eyebrow}
@@ -122,7 +102,12 @@ export function AuthShell({
                   </h2>
                 </div>
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-                  {cardIcon ?? <GraduationCap className="h-6 w-6 text-white" />}
+                  {cardIcon ?? (
+                    <ScholarMark
+                      className="rounded-2xl bg-[#0BA13C] p-2 text-white shadow-none"
+                      iconClassName="h-6 w-6"
+                    />
+                  )}
                 </div>
               </div>
 
