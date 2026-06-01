@@ -15,11 +15,15 @@ export type CourseRow = {
 };
 
 export type AssignmentRow = {
+  completed_at: string | null;
   course_id: string | null;
   created_at: string | null;
   difficulty: string | null;
   due_at: string | null;
   estimated_minutes: number | null;
+  grade_letter: string | null;
+  grade_number: number | null;
+  grade_type: "letter" | "number" | null;
   id: string;
   status: string | null;
   title: string;
@@ -70,10 +74,26 @@ export type DashboardCalendarItem = {
   typeLabel: string;
 };
 
+export type DashboardCourseGradeItem = {
+  courseColor: string | null;
+  courseId: string;
+  courseName: string;
+  displayLabel: string;
+  letterGrade: string;
+  percentage: number;
+};
+
+export type DashboardGradesPanel = {
+  gradedCount: number;
+  items: DashboardCourseGradeItem[];
+  missingGradeCount: number;
+};
+
 export type DashboardViewModel = {
   assignments: DashboardAssignment[];
   calendarDays: DashboardCalendarDay[];
   focus: DashboardFocus | null;
+  gradesPanel: DashboardGradesPanel;
   schedule: DashboardCalendarItem[];
   stats: DashboardStats;
 };
@@ -176,6 +196,47 @@ export type UpdateAssignmentStatusInput = {
   isCompleted: boolean;
 };
 
+export type UpdateAssignmentGradeInput = {
+  assignmentId: string;
+  gradeLetter?: string | null;
+  gradeNumber?: number | null;
+  gradeType: "letter" | "number";
+};
+
+export type GradesStatusFilter = "all" | "graded" | "ungraded";
+
+export type GradesSortOption = "most-recent";
+
+export type GradesCourseChip = {
+  color: string | null;
+  count: number;
+  id: string;
+  label: string;
+};
+
+export type GradesListItem = {
+  completedLabel: string;
+  course: string;
+  courseColor: string | null;
+  courseId: string | null;
+  gradeDisplay: string | null;
+  gradeLetter: string | null;
+  gradeNumber: number | null;
+  gradeType: "letter" | "number" | null;
+  id: string;
+  isGraded: boolean;
+  title: string;
+};
+
+export type GradesViewModel = {
+  completedCount: number;
+  courseChips: GradesCourseChip[];
+  emptyMessage: string;
+  gradedCount: number;
+  items: GradesListItem[];
+  missingGradeCount: number;
+};
+
 type SupabaseLikeError = {
   code?: string;
   details?: string;
@@ -187,12 +248,38 @@ const MAX_UP_NEXT_ASSIGNMENTS = 5;
 const MAX_SCHEDULE_ITEMS = 4;
 const WEEK_LENGTH = 7;
 const COURSE_DOCUMENTS_BUCKET = "course-documents";
+const ASSIGNMENT_SELECT_COLUMNS =
+  "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, completed_at, grade_type, grade_number, grade_letter, created_at";
 const ACCEPTED_DOCUMENT_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
+const LETTER_GRADE_SCALE = [
+  { letter: "A+", max: 100, midpoint: 95, min: 90 },
+  { letter: "A", max: 89.9, midpoint: 87.45, min: 85 },
+  { letter: "A-", max: 84.9, midpoint: 82.45, min: 80 },
+  { letter: "B+", max: 79.9, midpoint: 78.45, min: 77 },
+  { letter: "B", max: 76.9, midpoint: 74.95, min: 73 },
+  { letter: "B-", max: 72.9, midpoint: 71.45, min: 70 },
+  { letter: "C+", max: 69.9, midpoint: 68.45, min: 67 },
+  { letter: "C", max: 66.9, midpoint: 64.95, min: 63 },
+  { letter: "C-", max: 62.9, midpoint: 61.45, min: 60 },
+  { letter: "D+", max: 59.9, midpoint: 58.45, min: 57 },
+  { letter: "D", max: 56.9, midpoint: 54.95, min: 53 },
+  { letter: "D-", max: 52.9, midpoint: 51.45, min: 50 },
+  { letter: "F", max: 49.9, midpoint: 24.95, min: 0 },
+] as const;
+
 function getErrorMessage(error: unknown) {
+  if (isMissingAssignmentsGradeColumnsError(error)) {
+    return getMissingAssignmentsGradeColumnsMessage();
+  }
+
+  if (isMissingAssignmentsWeightColumnError(error)) {
+    return getMissingAssignmentsWeightColumnMessage();
+  }
+
   if (error instanceof Error) {
     return error.message;
   }
@@ -247,6 +334,19 @@ function normalizeWeightPercent(value: number | null | undefined) {
   return Math.min(100, Math.round(value * 10) / 10);
 }
 
+function normalizeGradeNumber(value: number | null | undefined) {
+  if (value == null || Number.isNaN(value) || value < 0) {
+    return null;
+  }
+
+  return Math.round(value * 100) / 100;
+}
+
+function normalizeGradeLetter(value: string | null | undefined) {
+  const normalized = value?.trim().toUpperCase();
+  return normalized ? normalized : null;
+}
+
 function isMissingDashboardTableError(error: unknown) {
   if (!error || typeof error !== "object") {
     return false;
@@ -290,8 +390,37 @@ function isMissingAssignmentsWeightColumnError(error: unknown) {
   );
 }
 
+function isMissingAssignmentsGradeColumnsError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const { details, hint, message } = error as SupabaseLikeError;
+  const combinedText = [message, details, hint]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+
+  const mentionsGradeColumn =
+    combinedText.includes("completed_at") ||
+    combinedText.includes("grade_type") ||
+    combinedText.includes("grade_number") ||
+    combinedText.includes("grade_letter");
+
+  return (
+    mentionsGradeColumn &&
+    (combinedText.includes("schema cache") ||
+      combinedText.includes("column") ||
+      combinedText.includes("does not exist"))
+  );
+}
+
 function getMissingAssignmentsWeightColumnMessage() {
   return "Your database is missing the new assignments weight column. Run the SQL in docs/supabase-add-weight-percent.sql, then try again.";
+}
+
+function getMissingAssignmentsGradeColumnsMessage() {
+  return "Your database is missing the new assignments grade columns. Run the SQL in docs/supabase-add-grades-columns.sql, then try again.";
 }
 
 function isCompletedStatus(status: string | null) {
@@ -302,6 +431,79 @@ function isCompletedStatus(status: string | null) {
   const normalized = status.trim().toLowerCase();
 
   return normalized === "done" || normalized === "completed";
+}
+
+function hasAssignmentGrade(
+  assignment: Pick<AssignmentRow, "grade_letter" | "grade_number" | "grade_type">,
+) {
+  if (assignment.grade_type === "number") {
+    return assignment.grade_number != null && !Number.isNaN(assignment.grade_number);
+  }
+
+  if (assignment.grade_type === "letter") {
+    return normalizeGradeLetter(assignment.grade_letter) != null;
+  }
+
+  return false;
+}
+
+function formatGradeValue(
+  assignment: Pick<AssignmentRow, "grade_letter" | "grade_number" | "grade_type">,
+) {
+  if (assignment.grade_type === "number") {
+    const normalizedNumber = normalizeGradeNumber(assignment.grade_number);
+
+    if (normalizedNumber == null) {
+      return null;
+    }
+
+    return Number.isInteger(normalizedNumber)
+      ? `${normalizedNumber}`
+      : normalizedNumber.toFixed(2).replace(/\.?0+$/, "");
+  }
+
+  if (assignment.grade_type === "letter") {
+    return normalizeGradeLetter(assignment.grade_letter);
+  }
+
+  return null;
+}
+
+function getGradePercentageFromAssignment(
+  assignment: Pick<
+    AssignmentRow,
+    "grade_letter" | "grade_number" | "grade_type"
+  >,
+) {
+  if (assignment.grade_type === "number") {
+    return normalizeGradeNumber(assignment.grade_number);
+  }
+
+  if (assignment.grade_type === "letter") {
+    const normalizedLetter = normalizeGradeLetter(assignment.grade_letter);
+
+    if (!normalizedLetter) {
+      return null;
+    }
+
+    return (
+      LETTER_GRADE_SCALE.find((entry) => entry.letter === normalizedLetter)
+        ?.midpoint ?? null
+    );
+  }
+
+  return null;
+}
+
+function getLetterGradeFromPercentage(percentage: number) {
+  const normalizedPercentage = Math.max(0, Math.min(100, percentage));
+
+  return (
+    LETTER_GRADE_SCALE.find(
+      (entry) =>
+        normalizedPercentage >= entry.min && normalizedPercentage <= entry.max,
+    )?.letter ?? "F"
+  );
 }
 
 function normalizeDifficulty(difficulty: string | null): DashboardDifficulty {
@@ -571,6 +773,36 @@ function compareAssignments(left: AssignmentRow, right: AssignmentRow) {
   return leftCreated - rightCreated;
 }
 
+function getAssignmentCompletedSortTime(assignment: AssignmentRow) {
+  const completedAt = assignment.completed_at
+    ? new Date(assignment.completed_at).getTime()
+    : Number.NaN;
+
+  if (!Number.isNaN(completedAt)) {
+    return completedAt;
+  }
+
+  const dueAt = assignment.due_at ? new Date(assignment.due_at).getTime() : Number.NaN;
+
+  if (!Number.isNaN(dueAt)) {
+    return dueAt;
+  }
+
+  const createdAt = assignment.created_at
+    ? new Date(assignment.created_at).getTime()
+    : Number.NaN;
+
+  if (!Number.isNaN(createdAt)) {
+    return createdAt;
+  }
+
+  return 0;
+}
+
+function compareCompletedAssignments(left: AssignmentRow, right: AssignmentRow) {
+  return getAssignmentCompletedSortTime(right) - getAssignmentCompletedSortTime(left);
+}
+
 function buildCalendarDays(
   currentDate: Date,
   assignments: AssignmentRow[],
@@ -605,7 +837,12 @@ export function buildDashboardViewModel(
   assignments: AssignmentRow[],
 ) {
   const currentDate = new Date();
-  const courseNames = new Map(courses.map((course) => [course.id, course.name]));
+  const courseLookup = new Map(
+    courses.map((course) => [
+      course.id,
+      { color: course.color, name: course.name },
+    ]),
+  );
   const sortedAssignments = [...assignments].sort(compareAssignments);
   const openAssignments = sortedAssignments.filter(
     (assignment) => !isCompletedStatus(assignment.status),
@@ -620,7 +857,7 @@ export function buildDashboardViewModel(
       const difficulty = normalizeDifficulty(assignment.difficulty);
 
       return {
-        course: courseNames.get(assignment.course_id ?? "") ?? "Unassigned",
+        course: courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned",
         difficulty,
         difficultyClassName: getDifficultyClassName(difficulty),
         dueLabel: formatDueLabel(assignment.due_at),
@@ -648,25 +885,89 @@ export function buildDashboardViewModel(
       const date = new Date(assignment.due_at as string);
 
       return {
-        course: courseNames.get(assignment.course_id ?? "") ?? "Unassigned",
+        course: courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned",
         timeLabel: Number.isNaN(date.getTime()) ? "TBD" : formatTime(date),
         title: assignment.title,
         typeLabel: "Deadline",
       } satisfies DashboardCalendarItem;
     });
 
+  const gradedCompletedAssignments = completedAssignments.filter((assignment) =>
+    hasAssignmentGrade(assignment),
+  );
+  const courseGrades = courses
+    .map((course) => {
+      const gradedAssignments = gradedCompletedAssignments
+        .filter((assignment) => assignment.course_id === course.id)
+        .map((assignment) => ({
+          percentage: getGradePercentageFromAssignment(assignment),
+          weightPercent: normalizeWeightPercent(assignment.weight_percent),
+        }))
+        .filter(
+          (
+            assignment,
+          ): assignment is {
+            percentage: number;
+            weightPercent: number | null;
+          } => assignment.percentage != null,
+        );
+
+      if (gradedAssignments.length === 0) {
+        return null;
+      }
+
+      const shouldUseWeightedAverage = gradedAssignments.every(
+        (assignment) =>
+          assignment.weightPercent != null && assignment.weightPercent > 0,
+      );
+      const averagePercentage = shouldUseWeightedAverage
+        ? gradedAssignments.reduce(
+            (sum, assignment) =>
+              sum +
+              assignment.percentage * ((assignment.weightPercent ?? 0) / 100),
+            0,
+          ) /
+          gradedAssignments.reduce(
+            (sum, assignment) => sum + ((assignment.weightPercent ?? 0) / 100),
+            0,
+          )
+        : gradedAssignments.reduce(
+            (sum, assignment) => sum + assignment.percentage,
+            0,
+          ) / gradedAssignments.length;
+      const roundedPercentage = Math.round(averagePercentage);
+      const letterGrade = getLetterGradeFromPercentage(averagePercentage);
+
+      return {
+        courseColor: course.color,
+        courseId: course.id,
+        courseName: course.name,
+        displayLabel: `${letterGrade}, ${roundedPercentage}%`,
+        letterGrade,
+        percentage: roundedPercentage,
+      } satisfies DashboardCourseGradeItem;
+    })
+    .filter((course): course is DashboardCourseGradeItem => course != null);
+  const gradesPanel = {
+    gradedCount: gradedCompletedAssignments.length,
+    items: courseGrades,
+    missingGradeCount:
+      completedAssignments.length - gradedCompletedAssignments.length,
+  } satisfies DashboardGradesPanel;
+
   return {
     assignments: assignmentCards,
     calendarDays: buildCalendarDays(currentDate, assignments),
     focus: focusSource
       ? {
-          course: courseNames.get(focusSource.course_id ?? "") ?? "Unassigned",
+          course: courseLookup.get(focusSource.course_id ?? "")?.name ?? "Unassigned",
           difficulty: normalizeDifficulty(focusSource.difficulty),
           dueLabel: formatRelativeDueLabel(focusSource.due_at, currentDate),
           estimatedLabel: formatEstimatedLabel(focusSource.estimated_minutes),
           title: focusSource.title,
         }
       : null,
+    gradesPanel,
     schedule,
     stats: {
       activeCourses: courses.length,
@@ -888,6 +1189,162 @@ export function buildAssignmentsViewModel(
   };
 }
 
+function formatCompletedLabel(assignment: AssignmentRow) {
+  const completedAt = assignment.completed_at
+    ? new Date(assignment.completed_at)
+    : null;
+
+  if (completedAt && !Number.isNaN(completedAt.getTime())) {
+    return `Completed ${new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+    }).format(completedAt)}`;
+  }
+
+  const dueAt = assignment.due_at ? new Date(assignment.due_at) : null;
+
+  if (dueAt && !Number.isNaN(dueAt.getTime())) {
+    return `Due ${new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+    }).format(dueAt)}`;
+  }
+
+  return "Completed date unavailable";
+}
+
+export function buildGradesViewModel(
+  courses: CourseRow[],
+  assignments: AssignmentRow[],
+  options: {
+    courseId?: string;
+    query?: string;
+    sort?: GradesSortOption;
+    status?: GradesStatusFilter;
+  } = {},
+): GradesViewModel {
+  const selectedCourseId = options.courseId ?? "all";
+  const normalizedQuery = options.query?.trim().toLowerCase() ?? "";
+  const activeStatus = options.status ?? "all";
+  const courseLookup = new Map(
+    courses.map((course) => [
+      course.id,
+      { color: course.color, name: course.name },
+    ]),
+  );
+
+  const completedAssignments = assignments.filter((assignment) =>
+    isCompletedStatus(assignment.status),
+  );
+  const gradedAssignments = completedAssignments.filter((assignment) =>
+    hasAssignmentGrade(assignment),
+  );
+  const matchingStatusAssignments = completedAssignments.filter((assignment) => {
+    const graded = hasAssignmentGrade(assignment);
+
+    if (activeStatus === "graded") {
+      return graded;
+    }
+
+    if (activeStatus === "ungraded") {
+      return !graded;
+    }
+
+    return true;
+  });
+
+  const filteredAssignments = matchingStatusAssignments.filter((assignment) => {
+    const matchesCourse =
+      selectedCourseId === "all" || assignment.course_id === selectedCourseId;
+    const courseName =
+      courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned";
+    const searchText = `${assignment.title} ${courseName}`.toLowerCase();
+    const matchesQuery =
+      normalizedQuery.length === 0 || searchText.includes(normalizedQuery);
+
+    return matchesCourse && matchesQuery;
+  });
+
+  const items = [...filteredAssignments].sort(compareCompletedAssignments).map((assignment) => {
+    const course = courseLookup.get(assignment.course_id ?? "");
+
+    return {
+      completedLabel: formatCompletedLabel(assignment),
+      course: course?.name ?? "Unassigned",
+      courseColor: course?.color ?? null,
+      courseId: assignment.course_id,
+      gradeDisplay: formatGradeValue(assignment),
+      gradeLetter: normalizeGradeLetter(assignment.grade_letter),
+      gradeNumber: normalizeGradeNumber(assignment.grade_number),
+      gradeType: assignment.grade_type,
+      id: assignment.id,
+      isGraded: hasAssignmentGrade(assignment),
+      title: assignment.title,
+    } satisfies GradesListItem;
+  });
+
+  const courseCounts = new Map<string, number>();
+  matchingStatusAssignments.forEach((assignment) => {
+    if (normalizedQuery.length > 0) {
+      const courseName =
+        courseLookup.get(assignment.course_id ?? "")?.name ?? "Unassigned";
+      const searchText = `${assignment.title} ${courseName}`.toLowerCase();
+
+      if (!searchText.includes(normalizedQuery)) {
+        return;
+      }
+    }
+
+    if (!assignment.course_id) {
+      return;
+    }
+
+    courseCounts.set(
+      assignment.course_id,
+      (courseCounts.get(assignment.course_id) ?? 0) + 1,
+    );
+  });
+
+  const courseChips: GradesCourseChip[] = [
+    {
+      color: null,
+      count: items.length,
+      id: "all",
+      label: "All courses",
+    },
+    ...courses
+      .map((course) => ({
+        color: course.color,
+        count: courseCounts.get(course.id) ?? 0,
+        id: course.id,
+        label: course.name,
+      }))
+      .filter((course) => course.count > 0 || course.id === selectedCourseId),
+  ];
+
+  let emptyMessage = "No completed assignments match your current filters.";
+
+  if (completedAssignments.length === 0) {
+    emptyMessage =
+      assignments.length === 0
+        ? "Completed assignments will show up here after you add coursework and mark it done."
+        : "You have assignments, but none are marked completed yet.";
+  } else if (activeStatus === "graded") {
+    emptyMessage = "No graded assignments match this view yet.";
+  } else if (activeStatus === "ungraded") {
+    emptyMessage = "Every completed assignment in this view already has a grade.";
+  }
+
+  return {
+    completedCount: completedAssignments.length,
+    courseChips,
+    emptyMessage,
+    gradedCount: gradedAssignments.length,
+    items,
+    missingGradeCount: completedAssignments.length - gradedAssignments.length,
+  };
+}
+
 async function loadAcademicData(userId: string) {
   const [coursesResult, assignmentsResult] = await Promise.all([
     supabase
@@ -897,9 +1354,7 @@ async function loadAcademicData(userId: string) {
       .order("created_at", { ascending: true }),
     supabase
       .from("assignments")
-      .select(
-        "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
-      )
+      .select(ASSIGNMENT_SELECT_COLUMNS)
       .eq("user_id", userId)
       .order("due_at", { ascending: true })
       .order("created_at", { ascending: true }),
@@ -924,6 +1379,10 @@ async function loadAcademicData(userId: string) {
   const assignments = (() => {
     if (!assignmentsResult.error) {
       return (assignmentsResult.data ?? []) as AssignmentRow[];
+    }
+
+    if (isMissingAssignmentsGradeColumnsError(assignmentsResult.error)) {
+      throw new Error(getMissingAssignmentsGradeColumnsMessage());
     }
 
     if (isMissingDashboardTableError(assignmentsResult.error)) {
@@ -1040,12 +1499,14 @@ export async function createAssignment(input: CreateAssignmentInput) {
         ? { weight_percent: normalizedWeightPercent }
         : {}),
     })
-    .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
-    )
+    .select(ASSIGNMENT_SELECT_COLUMNS)
     .single();
 
   if (error) {
+    if (isMissingAssignmentsGradeColumnsError(error)) {
+      throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
     if (isMissingAssignmentsWeightColumnError(error)) {
       throw new Error(getMissingAssignmentsWeightColumnMessage());
     }
@@ -1093,11 +1554,13 @@ export async function bulkCreateAssignments(inputs: CreateAssignmentInput[]) {
   const { data, error } = await supabase
     .from("assignments")
     .insert(payload)
-    .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
-    );
+    .select(ASSIGNMENT_SELECT_COLUMNS);
 
   if (error) {
+    if (isMissingAssignmentsGradeColumnsError(error)) {
+      throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
     if (isMissingAssignmentsWeightColumnError(error)) {
       throw new Error(getMissingAssignmentsWeightColumnMessage());
     }
@@ -1121,15 +1584,57 @@ export async function updateAssignmentStatus(
   const { data, error } = await supabase
     .from("assignments")
     .update({
+      completed_at: input.isCompleted ? new Date().toISOString() : null,
       status: input.isCompleted ? "done" : "todo",
     })
     .eq("id", input.assignmentId)
-    .select(
-      "id, user_id, course_id, title, due_at, status, difficulty, estimated_minutes, weight_percent, created_at",
-    )
+    .select(ASSIGNMENT_SELECT_COLUMNS)
     .single();
 
   if (error) {
+    if (isMissingAssignmentsGradeColumnsError(error)) {
+      throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
+    throw error;
+  }
+
+  return data as AssignmentRow;
+}
+
+export async function updateAssignmentGrade(
+  input: UpdateAssignmentGradeInput,
+) {
+  const nextGradeType = input.gradeType;
+  const nextGradeNumber =
+    nextGradeType === "number" ? normalizeGradeNumber(input.gradeNumber) : null;
+  const nextGradeLetter =
+    nextGradeType === "letter" ? normalizeGradeLetter(input.gradeLetter) : null;
+
+  if (nextGradeType === "number" && nextGradeNumber == null) {
+    throw new Error("Enter a numeric grade before saving.");
+  }
+
+  if (nextGradeType === "letter" && nextGradeLetter == null) {
+    throw new Error("Choose a letter grade before saving.");
+  }
+
+  const { data, error } = await supabase
+    .from("assignments")
+    .update({
+      grade_letter: nextGradeLetter,
+      grade_number: nextGradeNumber,
+      grade_type: nextGradeType,
+    })
+    .eq("id", input.assignmentId)
+    .select(ASSIGNMENT_SELECT_COLUMNS)
+    .single();
+
+  if (error) {
+    if (isMissingAssignmentsGradeColumnsError(error)) {
+      throw new Error(getMissingAssignmentsGradeColumnsMessage());
+    }
+
     throw error;
   }
 
