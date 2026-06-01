@@ -14,16 +14,16 @@ import {
 import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
 
 type SidebarProps = {
-  activeView: "assignments" | "dashboard";
+  activeView: "assignments" | "dashboard" | "grades";
   isSigningOut: boolean;
-  onNavigate: (view: "assignments" | "dashboard") => void;
+  onNavigate: (view: "assignments" | "dashboard" | "grades") => void;
   onSignOut: () => Promise<void> | void;
 };
 
 const navigationItems = [
   { icon: LayoutDashboard, label: "Dashboard", view: "dashboard" },
   { icon: CheckSquare, label: "Assignments", view: "assignments" },
-  { icon: BarChart3, label: "Grades" },
+  { icon: BarChart3, label: "Grades", view: "grades" },
   { icon: Calendar, label: "Calendar" },
 ] as const;
 

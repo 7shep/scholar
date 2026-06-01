@@ -5,8 +5,10 @@ import * as React from "react";
 import { AddAssignmentModal } from "@/components/dashboard/add-assignment-modal";
 import { AssignmentsPage } from "@/components/dashboard/assignments-page";
 import { CourseGrades } from "@/components/dashboard/course-grades";
+import { GradesPage } from "@/components/dashboard/grades-page";
 import {
   type DashboardViewModel,
+  updateAssignmentGrade,
   updateAssignmentStatus,
   useDashboardData,
 } from "@/components/dashboard/dashboard-data";
@@ -26,7 +28,7 @@ type HomePageProps = {
   userId: string;
 };
 
-type AppView = "assignments" | "dashboard";
+type AppView = "assignments" | "dashboard" | "grades";
 
 function DashboardLoadingState() {
   return (
@@ -203,6 +205,19 @@ export function HomePage({
     [reload],
   );
 
+  const handleSaveAssignmentGrade = React.useCallback(
+    async (input: {
+      assignmentId: string;
+      gradeLetter?: string | null;
+      gradeNumber?: number | null;
+      gradeType: "letter" | "number";
+    }) => {
+      await updateAssignmentGrade(input);
+      await reload();
+    },
+    [reload],
+  );
+
   const dashboardContent = React.useMemo(() => {
     if (status === "loading") {
       return <DashboardLoadingState />;
@@ -248,13 +263,22 @@ export function HomePage({
               <div className="mx-auto max-w-6xl">
                 {activeView === "dashboard" ? (
                   dashboardContent
-                ) : (
+                ) : activeView === "assignments" ? (
                   <AssignmentsPage
                     assignments={assignments}
                     error={error}
                     onOpenAddAssignment={handleOpenAddAssignment}
                     onReload={reload}
                     onToggleAssignmentStatus={handleToggleAssignmentStatus}
+                    rawCourses={rawCourses}
+                    status={status}
+                  />
+                ) : (
+                  <GradesPage
+                    assignments={assignments}
+                    error={error}
+                    onReload={reload}
+                    onSaveAssignmentGrade={handleSaveAssignmentGrade}
                     rawCourses={rawCourses}
                     status={status}
                   />
