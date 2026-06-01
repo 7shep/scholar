@@ -18,6 +18,9 @@ create table if not exists public.assignments (
   status text not null default 'todo' check (status in ('todo', 'done', 'completed')),
   difficulty text check (difficulty in ('easy', 'medium', 'hard')),
   estimated_minutes integer check (estimated_minutes is null or estimated_minutes >= 0),
+  weight_percent numeric(5, 2) check (
+    weight_percent is null or (weight_percent >= 0 and weight_percent <= 100)
+  ),
   created_at timestamptz not null default now()
 );
 
@@ -114,25 +117,45 @@ drop policy if exists "course_documents_select_own" on public.course_documents;
 create policy "course_documents_select_own"
 on public.course_documents
 for select
+to authenticated
 using (auth.uid() = user_id);
 
 drop policy if exists "course_documents_insert_own" on public.course_documents;
 create policy "course_documents_insert_own"
 on public.course_documents
 for insert
-with check (auth.uid() = user_id);
+to authenticated
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from public.courses
+    where courses.id = course_documents.course_id
+      and courses.user_id = auth.uid()
+  )
+);
 
 drop policy if exists "course_documents_update_own" on public.course_documents;
 create policy "course_documents_update_own"
 on public.course_documents
 for update
+to authenticated
 using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from public.courses
+    where courses.id = course_documents.course_id
+      and courses.user_id = auth.uid()
+  )
+);
 
 drop policy if exists "course_documents_delete_own" on public.course_documents;
 create policy "course_documents_delete_own"
 on public.course_documents
 for delete
+to authenticated
 using (auth.uid() = user_id);
 
 insert into storage.buckets (id, name, public)
@@ -143,40 +166,44 @@ drop policy if exists "course_documents_bucket_select_own" on storage.objects;
 create policy "course_documents_bucket_select_own"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'course-documents'
-  and auth.uid()::text = (storage.foldername(name))[1]
+  and owner_id = (select auth.uid()::text)
 );
 
 drop policy if exists "course_documents_bucket_insert_own" on storage.objects;
 create policy "course_documents_bucket_insert_own"
 on storage.objects
 for insert
+to authenticated
 with check (
   bucket_id = 'course-documents'
-  and auth.uid()::text = (storage.foldername(name))[1]
+  and (storage.foldername(name))[1] = (select auth.uid()::text)
 );
 
 drop policy if exists "course_documents_bucket_update_own" on storage.objects;
 create policy "course_documents_bucket_update_own"
 on storage.objects
 for update
+to authenticated
 using (
   bucket_id = 'course-documents'
-  and auth.uid()::text = (storage.foldername(name))[1]
+  and owner_id = (select auth.uid()::text)
 )
 with check (
   bucket_id = 'course-documents'
-  and auth.uid()::text = (storage.foldername(name))[1]
+  and (storage.foldername(name))[1] = (select auth.uid()::text)
 );
 
 drop policy if exists "course_documents_bucket_delete_own" on storage.objects;
 create policy "course_documents_bucket_delete_own"
 on storage.objects
 for delete
+to authenticated
 using (
   bucket_id = 'course-documents'
-  and auth.uid()::text = (storage.foldername(name))[1]
+  and owner_id = (select auth.uid()::text)
 );
 
 select id, email
@@ -194,7 +221,8 @@ insert into public.assignments (
   due_at,
   status,
   difficulty,
-  estimated_minutes
+  estimated_minutes,
+  weight_percent
 )
 values (
   'YOUR_USER_ID_HERE',
@@ -203,5 +231,6 @@ values (
   now() + interval '2 days',
   'todo',
   'medium',
-  90
+  90,
+  15
 );

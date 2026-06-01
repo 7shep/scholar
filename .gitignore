@@ -3,3 +3,6 @@ dist
 .DS_Store
 *.log
 .env
+# Supabase Local Development
+**/supabase/.temp/
+**/supabase/.branches/
