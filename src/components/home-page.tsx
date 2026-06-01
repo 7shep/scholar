@@ -227,12 +227,10 @@ export function HomePage({
 
   return (
     <>
-      <main className="min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-[#CCFF00] selection:text-slate-900">
+      <main className="app-scroll-shell min-h-screen bg-[#FAFAFA] text-slate-900 selection:bg-[#CCFF00] selection:text-slate-900">
         <div className="flex min-h-screen w-full flex-col lg:flex-row">
           <Sidebar
             activeView={activeView}
-            displayName={displayName}
-            email={email}
             isSigningOut={isSigningOut}
             onNavigate={setActiveView}
             onSignOut={onSignOut}

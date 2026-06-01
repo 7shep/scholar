@@ -11,15 +11,10 @@ import {
   Settings,
 } from "lucide-react";
 
-import {
-  getAcademicTermLabel,
-  getInitials,
-} from "@/components/dashboard/dashboard-utils";
+import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
 
 type SidebarProps = {
   activeView: "assignments" | "dashboard";
-  displayName: string;
-  email?: string;
   isSigningOut: boolean;
   onNavigate: (view: "assignments" | "dashboard") => void;
   onSignOut: () => Promise<void> | void;
@@ -34,13 +29,10 @@ const navigationItems = [
 
 export function Sidebar({
   activeView,
-  displayName,
-  email,
   isSigningOut,
   onNavigate,
   onSignOut,
 }: SidebarProps) {
-  const initials = getInitials(displayName);
   const termLabel = getAcademicTermLabel();
 
   return (
@@ -54,11 +46,8 @@ export function Sidebar({
               </div>
               <div>
                 <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                  Scholar
+                  Scholar, by Alex
                 </h2>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                  Unified dashboard
-                </p>
               </div>
             </div>
 
@@ -103,23 +92,7 @@ export function Sidebar({
         </div>
 
         <div className="mt-auto border-t border-slate-100 p-4 sm:p-6">
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-sm font-bold text-white">
-                {initials}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-slate-900">
-                  {displayName}
-                </div>
-                <div className="truncate text-xs text-slate-500">
-                  {email ?? "student@school.edu"}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
             <button
               type="button"
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"

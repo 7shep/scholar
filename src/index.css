@@ -11,8 +11,28 @@
     --foreground: 220 20% 97%;
   }
 
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
   * {
     @apply border-slate-700;
+  }
+
+  html,
+  body,
+  #root {
+    -ms-overflow-style: none;
+    overflow: hidden;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  #root::-webkit-scrollbar {
+    display: none;
   }
 
   body {
@@ -42,5 +62,16 @@
 
   .animate-fade-in-up {
     animation: fade-in-up 520ms ease-out both;
+  }
+
+  .app-scroll-shell {
+    height: 100%;
+    overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .app-scroll-shell::-webkit-scrollbar {
+    display: none;
   }
 }
