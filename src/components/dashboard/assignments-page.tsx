@@ -28,11 +28,17 @@ type AssignmentsPageProps = {
   error: string | null;
   onOpenAddAssignment: () => void;
   onReload: () => Promise<void>;
+  onSearchQueryChange: (query: string) => void;
   onToggleAssignmentStatus: (
     assignmentId: string,
     isCompleted: boolean,
   ) => Promise<void>;
   rawCourses: CourseRow[];
+  searchFocusRequest: {
+    selectText: boolean;
+    token: number;
+  };
+  searchQuery: string;
   status: DashboardStatus;
 };
 
@@ -189,18 +195,22 @@ export function AssignmentsPage({
   error,
   onOpenAddAssignment,
   onReload,
+  onSearchQueryChange,
   onToggleAssignmentStatus,
   rawCourses,
+  searchFocusRequest,
+  searchQuery,
   status,
 }: AssignmentsPageProps) {
   const [activeFilter, setActiveFilter] =
     React.useState<AssignmentsStatusFilter>("all");
-  const [searchQuery, setSearchQuery] = React.useState("");
   const deferredSearchQuery = React.useDeferredValue(searchQuery);
   const [selectedCourseId, setSelectedCourseId] = React.useState("all");
   const [pendingAssignmentId, setPendingAssignmentId] = React.useState<
     string | null
   >(null);
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
+  const handledSearchFocusTokenRef = React.useRef(0);
 
   const viewModel = React.useMemo(
     () =>
@@ -231,6 +241,37 @@ export function AssignmentsPage({
     selectedCourseId,
     status,
     viewModel,
+  ]);
+
+  React.useEffect(() => {
+    if (
+      searchFocusRequest.token === 0 ||
+      handledSearchFocusTokenRef.current === searchFocusRequest.token
+    ) {
+      return;
+    }
+
+    const input = searchInputRef.current;
+
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+
+    if (searchFocusRequest.selectText) {
+      input.select();
+      handledSearchFocusTokenRef.current = searchFocusRequest.token;
+      return;
+    }
+
+    const cursorPosition = input.value.length;
+    input.setSelectionRange(cursorPosition, cursorPosition);
+    handledSearchFocusTokenRef.current = searchFocusRequest.token;
+  }, [
+    searchFocusRequest.selectText,
+    searchFocusRequest.token,
+    status,
   ]);
 
   const handleToggleStatus = React.useCallback(
@@ -355,9 +396,11 @@ export function AssignmentsPage({
             <label className="relative block min-w-0 sm:w-72">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
+                ref={searchInputRef}
+                data-assignment-search-input="true"
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => onSearchQueryChange(event.target.value)}
                 placeholder="Search..."
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
               />
@@ -436,7 +479,7 @@ export function AssignmentsPage({
                 type="button"
                 onClick={() => {
                   setActiveFilter("all");
-                  setSearchQuery("");
+                  onSearchQueryChange("");
                   setSelectedCourseId("all");
                 }}
                 className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"

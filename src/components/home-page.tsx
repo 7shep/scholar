@@ -30,6 +30,32 @@ type HomePageProps = {
 
 type AppView = "assignments" | "dashboard" | "grades";
 type AppTheme = "dark" | "light";
+type AssignmentSearchFocusRequest = {
+  selectText: boolean;
+  token: number;
+};
+
+function isEditableElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+
+  return (
+    tagName === "input" ||
+    tagName === "select" ||
+    tagName === "textarea" ||
+    target.isContentEditable
+  );
+}
+
+function isAssignmentSearchElement(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    target.dataset.assignmentSearchInput === "true"
+  );
+}
 
 function DashboardLoadingState() {
   return (
@@ -190,6 +216,12 @@ export function HomePage({
     viewModel,
   } = useDashboardData(userId);
   const [activeView, setActiveView] = React.useState<AppView>("dashboard");
+  const [assignmentSearchFocusRequest, setAssignmentSearchFocusRequest] =
+    React.useState<AssignmentSearchFocusRequest>({
+      selectText: false,
+      token: 0,
+    });
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = React.useState("");
   const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
 
@@ -220,6 +252,54 @@ export function HomePage({
   const handleCloseAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(false);
   }, []);
+
+  const activateAssignmentSearch = React.useCallback(
+    (options?: { query?: string; selectText?: boolean }) => {
+      if (typeof options?.query === "string") {
+        setAssignmentSearchQuery(options.query);
+      }
+
+      setActiveView("assignments");
+      setAssignmentSearchFocusRequest((currentRequest) => ({
+        selectText: options?.selectText ?? false,
+        token: currentRequest.token + 1,
+      }));
+    },
+    [],
+  );
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      const isSearchShortcut =
+        event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey);
+
+      if (!isSearchShortcut) {
+        return;
+      }
+
+      if (
+        isEditableElement(event.target) &&
+        !isAssignmentSearchElement(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      activateAssignmentSearch({
+        selectText: activeView === "assignments",
+      });
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeydown);
+    };
+  }, [activateAssignmentSearch, activeView]);
 
   const handleToggleAssignmentStatus = React.useCallback(
     async (assignmentId: string, isCompleted: boolean) => {
@@ -301,7 +381,10 @@ export function HomePage({
             {activeView === "dashboard" ? (
               <TopBar
                 displayName={displayName}
+                onActivateSearch={activateAssignmentSearch}
                 onQuickAdd={handleOpenAddAssignment}
+                onSearchQueryChange={setAssignmentSearchQuery}
+                searchQuery={assignmentSearchQuery}
               />
             ) : null}
 
@@ -315,8 +398,11 @@ export function HomePage({
                     error={error}
                     onOpenAddAssignment={handleOpenAddAssignment}
                     onReload={reload}
+                    onSearchQueryChange={setAssignmentSearchQuery}
                     onToggleAssignmentStatus={handleToggleAssignmentStatus}
                     rawCourses={rawCourses}
+                    searchFocusRequest={assignmentSearchFocusRequest}
+                    searchQuery={assignmentSearchQuery}
                     status={status}
                   />
                 ) : (
