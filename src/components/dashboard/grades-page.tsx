@@ -369,9 +369,18 @@ export function GradesPage({
         courseId: selectedCourseId,
         query: deferredSearchQuery,
         status: activeFilter,
-      }),
+    }),
     [activeFilter, assignments, deferredSearchQuery, rawCourses, selectedCourseId],
   );
+
+  React.useEffect(() => {
+    if (
+      selectedCourseId !== "all" &&
+      !rawCourses.some((course) => course.id === selectedCourseId)
+    ) {
+      setSelectedCourseId("all");
+    }
+  }, [rawCourses, selectedCourseId]);
 
   const renderHeader = () => (
     <div>

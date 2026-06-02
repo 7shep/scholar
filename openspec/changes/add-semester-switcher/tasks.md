@@ -1,0 +1,4 @@
+- [x] Add shared semester-option helpers that derive distinct sidebar choices from `courses.term`, choose a default selection, and persist it locally.
+- [x] Update the signed-in shell and sidebar so the semester button becomes a working selector on desktop and mobile without breaking the nearby theme toggle.
+- [x] Apply the active semester filter to dashboard data, assignments, grades, and existing course pickers used by the add-assignment flow.
+- [x] Prefill the inline course term field from the selected semester when creating a new course, and verify fallback behavior for `All semesters` and courses with no term.

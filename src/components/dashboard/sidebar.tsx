@@ -1,7 +1,9 @@
 "use client";
 
+import * as React from "react";
 import {
   BarChart3,
+  Check,
   CheckSquare,
   ChevronDown,
   LayoutDashboard,
@@ -11,14 +13,18 @@ import {
 } from "lucide-react";
 
 import { ScholarMark } from "@/components/brand/scholar-mark";
-import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
+import type { SemesterOption } from "@/components/dashboard/semester-utils";
 
 type SidebarProps = {
   activeView: "assignments" | "dashboard" | "grades";
   isSigningOut: boolean;
   onNavigate: (view: "assignments" | "dashboard" | "grades") => void;
+  onSelectSemester: (semesterId: string) => void;
   onSignOut: () => Promise<void> | void;
   onToggleTheme: () => void;
+  selectedSemesterId: string;
+  selectedSemesterLabel: string;
+  semesterOptions: SemesterOption[];
   theme: "dark" | "light";
 };
 
@@ -28,15 +34,111 @@ const navigationItems = [
   { icon: BarChart3, label: "Grades", view: "grades" },
 ] as const;
 
+function SemesterSelector({
+  onSelectSemester,
+  selectedSemesterId,
+  selectedSemesterLabel,
+  semesterOptions,
+}: Pick<
+  SidebarProps,
+  "onSelectSemester" | "selectedSemesterId" | "selectedSemesterLabel" | "semesterOptions"
+>) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="relative min-w-0" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((currentValue) => !currentValue)}
+        className="inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+      >
+        <span className="truncate">{selectedSemesterLabel}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-500 transition ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute left-0 top-full z-20 mt-2 min-w-[15rem] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg"
+          role="menu"
+        >
+          {semesterOptions.map((option) => {
+            const isSelected = option.id === selectedSemesterId;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  onSelectSemester(option.id);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+                  isSelected
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+                role="menuitemradio"
+                aria-checked={isSelected}
+              >
+                <span className="truncate">{option.label}</span>
+                {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Sidebar({
   activeView,
   isSigningOut,
   onNavigate,
+  onSelectSemester,
   onSignOut,
   onToggleTheme,
+  selectedSemesterId,
+  selectedSemesterLabel,
+  semesterOptions,
   theme,
 }: SidebarProps) {
-  const termLabel = getAcademicTermLabel();
   const ThemeIcon = theme === "light" ? Sun : Moon;
 
   return (
@@ -54,13 +156,12 @@ export function Sidebar({
             </div>
 
             <div className="hidden items-center gap-2 lg:mt-5 lg:inline-flex">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-              >
-                {termLabel}
-                <ChevronDown className="h-4 w-4 text-slate-500" />
-              </button>
+              <SemesterSelector
+                onSelectSemester={onSelectSemester}
+                selectedSemesterId={selectedSemesterId}
+                selectedSemesterLabel={selectedSemesterLabel}
+                semesterOptions={semesterOptions}
+              />
               <button
                 type="button"
                 onClick={onToggleTheme}
@@ -73,13 +174,14 @@ export function Sidebar({
           </div>
 
           <div className="mt-6 flex items-center gap-2 lg:hidden">
-            <button
-              type="button"
-              className="inline-flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-            >
-              {termLabel}
-              <ChevronDown className="h-4 w-4 text-slate-500" />
-            </button>
+            <div className="min-w-0 flex-1">
+              <SemesterSelector
+                onSelectSemester={onSelectSemester}
+                selectedSemesterId={selectedSemesterId}
+                selectedSemesterLabel={selectedSemesterLabel}
+                semesterOptions={semesterOptions}
+              />
+            </div>
             <button
               type="button"
               onClick={onToggleTheme}
