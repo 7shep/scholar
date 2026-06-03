@@ -31,6 +31,7 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { UpNextPanel } from "@/components/dashboard/up-next-panel";
+import { TutorialCallout } from "@/components/dashboard/tutorial-callout";
 import {
   safeLocalStorageGet,
   safeLocalStorageSet,
@@ -46,6 +47,45 @@ type HomePageProps = {
 
 type AppView = "assignments" | "dashboard" | "grades";
 type AppTheme = "dark" | "light";
+type TutorialAnchorKey =
+  | "tutorial-assignments-nav"
+  | "tutorial-dashboard-nav"
+  | "tutorial-grades-nav";
+type TutorialStep = {
+  anchorKey: TutorialAnchorKey;
+  description: string;
+  title: string;
+  view: AppView;
+};
+
+const TUTORIAL_DISMISSED_PREFIX = "scholar-tutorial-dismissed";
+const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    anchorKey: "tutorial-dashboard-nav",
+    description:
+      "This is your home base. Open Dashboard to check your current GPA, upcoming work, and the items that need attention first.",
+    title: "Dashboard",
+    view: "dashboard",
+  },
+  {
+    anchorKey: "tutorial-assignments-nav",
+    description:
+      "Use Assignments to keep track of open work, mark items complete, and stay on top of overdue deadlines.",
+    title: "Assignments",
+    view: "assignments",
+  },
+  {
+    anchorKey: "tutorial-grades-nav",
+    description:
+      "Use Grades to enter scores, review course summaries, and see how each grade affects your academic progress.",
+    title: "Grades",
+    view: "grades",
+  },
+];
+
+function getTutorialStorageKey(userId: string) {
+  return `${TUTORIAL_DISMISSED_PREFIX}:${userId}`;
+}
 
 function DashboardLoadingState() {
   return (
@@ -102,7 +142,11 @@ function DashboardErrorState({
   );
 }
 
-function DashboardEmptyState({ onOpenAddAssignment }: { onOpenAddAssignment: () => void }) {
+function DashboardEmptyState({
+  onOpenAddAssignment,
+}: {
+  onOpenAddAssignment: () => void;
+}) {
   return (
     <section className="animate-fade-in-up rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
@@ -197,6 +241,10 @@ export function HomePage({
   userId,
 }: HomePageProps) {
   const displayName = getDisplayName(fullName, email);
+  const tutorialStorageKey = React.useMemo(
+    () => getTutorialStorageKey(userId),
+    [userId],
+  );
   const {
     assignments,
     error,
@@ -265,6 +313,8 @@ export function HomePage({
 
     return hasVisibleData ? "ready" : "empty";
   }, [filteredCourses.length, filteredViewModel.stats, status]);
+  const [isTutorialOpen, setIsTutorialOpen] = React.useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = React.useState(0);
 
   React.useEffect(() => {
     const savedTheme = safeLocalStorageGet("scholar-theme");
@@ -290,6 +340,25 @@ export function HomePage({
     safeLocalStorageSet(semesterSelectionStorageKey, resolvedSemesterId);
   }, [resolvedSemesterId, semesterSelectionStorageKey, status]);
 
+  React.useEffect(() => {
+    const dismissed = safeLocalStorageGet(tutorialStorageKey) === "true";
+
+    setIsTutorialOpen(false);
+
+    if (!dismissed) {
+      setTutorialStepIndex(0);
+      setIsTutorialOpen(true);
+    }
+  }, [tutorialStorageKey]);
+
+  React.useEffect(() => {
+    if (!isTutorialOpen) {
+      return;
+    }
+
+    setActiveView(TUTORIAL_STEPS[tutorialStepIndex].view);
+  }, [isTutorialOpen, tutorialStepIndex]);
+
   const handleOpenAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(true);
   }, []);
@@ -297,6 +366,25 @@ export function HomePage({
   const handleCloseAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(false);
   }, []);
+
+  const handleOpenTutorial = React.useCallback(() => {
+    setTutorialStepIndex(0);
+    setIsTutorialOpen(true);
+  }, []);
+
+  const handleCloseTutorial = React.useCallback(() => {
+    setIsTutorialOpen(false);
+    safeLocalStorageSet(tutorialStorageKey, "true");
+  }, [tutorialStorageKey]);
+
+  const handleAdvanceTutorial = React.useCallback(() => {
+    if (tutorialStepIndex >= TUTORIAL_STEPS.length - 1) {
+      handleCloseTutorial();
+      return;
+    }
+
+    setTutorialStepIndex((currentStep) => currentStep + 1);
+  }, [handleCloseTutorial, tutorialStepIndex]);
 
   const handleToggleAssignmentStatus = React.useCallback(
     async (assignmentId: string, isCompleted: boolean) => {
@@ -360,17 +448,27 @@ export function HomePage({
     <>
       <main
         className={`app-scroll-shell min-h-screen selection:bg-[#CCFF00] selection:text-slate-900 ${
-          theme === "dark" ? "bg-slate-950 text-slate-50" : "bg-[#FAFAFA] text-slate-900"
+          theme === "dark"
+            ? "bg-slate-950 text-slate-50"
+            : "bg-[#FAFAFA] text-slate-900"
         }`}
       >
         <div
           className={`flex min-h-screen w-full flex-col lg:flex-row ${
-            theme === "dark" ? "app-theme-dark bg-slate-950 text-slate-50" : "app-theme-light bg-[#FAFAFA] text-slate-900"
+            theme === "dark"
+              ? "app-theme-dark bg-slate-950 text-slate-50"
+              : "app-theme-light bg-[#FAFAFA] text-slate-900"
           }`}
         >
           <Sidebar
             activeView={activeView}
             isSigningOut={isSigningOut}
+            highlightedTutorialAnchorKey={
+              isTutorialOpen
+                ? TUTORIAL_STEPS[tutorialStepIndex].anchorKey
+                : null
+            }
+            onOpenTutorial={handleOpenTutorial}
             onNavigate={setActiveView}
             onSelectSemester={setSelectedSemesterId}
             onSignOut={onSignOut}
@@ -436,6 +534,17 @@ export function HomePage({
         onClose={handleCloseAddAssignment}
         onDataChanged={reload}
         userId={userId}
+      />
+
+      <TutorialCallout
+        anchorKey={TUTORIAL_STEPS[tutorialStepIndex].anchorKey}
+        currentStep={tutorialStepIndex}
+        description={TUTORIAL_STEPS[tutorialStepIndex].description}
+        isOpen={isTutorialOpen}
+        onClose={handleCloseTutorial}
+        onNext={handleAdvanceTutorial}
+        title={TUTORIAL_STEPS[tutorialStepIndex].title}
+        totalSteps={TUTORIAL_STEPS.length}
       />
     </>
   );
