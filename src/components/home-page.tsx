@@ -7,18 +7,35 @@ import { AssignmentsPage } from "@/components/dashboard/assignments-page";
 import { CourseGrades } from "@/components/dashboard/course-grades";
 import { GradesPage } from "@/components/dashboard/grades-page";
 import {
+  buildDashboardViewModel,
   type DashboardViewModel,
   updateAssignmentGrade,
   updateAssignmentStatus,
   useDashboardData,
 } from "@/components/dashboard/dashboard-data";
-import { getDisplayName } from "@/components/dashboard/dashboard-utils";
+import {
+  getAcademicTermLabel,
+  getDisplayName,
+} from "@/components/dashboard/dashboard-utils";
 import { FocusCard } from "@/components/dashboard/focus-card";
 import { MiniCalendar } from "@/components/dashboard/mini-calendar";
+import {
+  buildSemesterOptions,
+  filterAssignmentsBySemester,
+  filterCoursesBySemester,
+  getSemesterOptionById,
+  getSemesterSelectionStorageKey,
+  resolveSelectedSemesterId,
+} from "@/components/dashboard/semester-utils";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { UpNextPanel } from "@/components/dashboard/up-next-panel";
+import { TutorialCallout } from "@/components/dashboard/tutorial-callout";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+} from "@/lib/safe-storage";
 
 type HomePageProps = {
   email?: string;
@@ -112,7 +129,11 @@ function DashboardErrorState({
   );
 }
 
-function DashboardEmptyState({ onOpenAddAssignment }: { onOpenAddAssignment: () => void }) {
+function DashboardEmptyState({
+  onOpenAddAssignment,
+}: {
+  onOpenAddAssignment: () => void;
+}) {
   return (
     <section className="animate-fade-in-up rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
       <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
@@ -207,6 +228,10 @@ export function HomePage({
   userId,
 }: HomePageProps) {
   const displayName = getDisplayName(fullName, email);
+  const tutorialStorageKey = React.useMemo(
+    () => getTutorialStorageKey(userId),
+    [userId],
+  );
   const {
     assignments,
     error,
@@ -224,13 +249,68 @@ export function HomePage({
   const [assignmentSearchQuery, setAssignmentSearchQuery] = React.useState("");
   const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
+  const semesterSelectionStorageKey = React.useMemo(
+    () => getSemesterSelectionStorageKey(userId),
+    [userId],
+  );
+  const [selectedSemesterId, setSelectedSemesterId] = React.useState<
+    string | null
+  >(() => safeLocalStorageGet(semesterSelectionStorageKey));
+  const semesterOptions = React.useMemo(
+    () => buildSemesterOptions(rawCourses),
+    [rawCourses],
+  );
+  const storedSemesterSelectionId = safeLocalStorageGet(
+    semesterSelectionStorageKey,
+  );
+  const resolvedSemesterId = React.useMemo(
+    () =>
+      resolveSelectedSemesterId({
+        currentAcademicTermLabel: getAcademicTermLabel(),
+        currentSelectionId: selectedSemesterId,
+        options: semesterOptions,
+        savedSelectionId: storedSemesterSelectionId,
+      }),
+    [semesterOptions, selectedSemesterId, storedSemesterSelectionId],
+  );
+  const activeSemesterOption = React.useMemo(
+    () => getSemesterOptionById(semesterOptions, resolvedSemesterId),
+    [resolvedSemesterId, semesterOptions],
+  );
+  const filteredCourses = React.useMemo(
+    () => filterCoursesBySemester(rawCourses, activeSemesterOption),
+    [activeSemesterOption, rawCourses],
+  );
+  const filteredAssignments = React.useMemo(
+    () =>
+      filterAssignmentsBySemester(
+        assignments,
+        filteredCourses,
+        activeSemesterOption,
+      ),
+    [activeSemesterOption, assignments, filteredCourses],
+  );
+  const filteredViewModel = React.useMemo(
+    () => buildDashboardViewModel(filteredCourses, filteredAssignments),
+    [filteredAssignments, filteredCourses],
+  );
+  const semesterScopedStatus = React.useMemo(() => {
+    if (status === "loading" || status === "error") {
+      return status;
     }
 
-    const savedTheme = window.localStorage.getItem("scholar-theme");
+    const hasVisibleData =
+      filteredCourses.length > 0 ||
+      filteredViewModel.stats.openAssignments > 0 ||
+      filteredViewModel.stats.completedAssignments > 0;
+
+    return hasVisibleData ? "ready" : "empty";
+  }, [filteredCourses.length, filteredViewModel.stats, status]);
+  const [isTutorialOpen, setIsTutorialOpen] = React.useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    const savedTheme = safeLocalStorageGet("scholar-theme");
 
     if (savedTheme === "light" || savedTheme === "dark") {
       setTheme(savedTheme);
@@ -238,12 +318,39 @@ export function HomePage({
   }, []);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
+    safeLocalStorageSet("scholar-theme", theme);
+  }, [theme]);
+
+  React.useEffect(() => {
+    if (status === "loading") {
       return;
     }
 
-    window.localStorage.setItem("scholar-theme", theme);
-  }, [theme]);
+    if (resolvedSemesterId == null) {
+      return;
+    }
+
+    safeLocalStorageSet(semesterSelectionStorageKey, resolvedSemesterId);
+  }, [resolvedSemesterId, semesterSelectionStorageKey, status]);
+
+  React.useEffect(() => {
+    const dismissed = safeLocalStorageGet(tutorialStorageKey) === "true";
+
+    setIsTutorialOpen(false);
+
+    if (!dismissed) {
+      setTutorialStepIndex(0);
+      setIsTutorialOpen(true);
+    }
+  }, [tutorialStorageKey]);
+
+  React.useEffect(() => {
+    if (!isTutorialOpen) {
+      return;
+    }
+
+    setActiveView(TUTORIAL_STEPS[tutorialStepIndex].view);
+  }, [isTutorialOpen, tutorialStepIndex]);
 
   const handleOpenAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(true);
@@ -326,15 +433,15 @@ export function HomePage({
   );
 
   const dashboardContent = React.useMemo(() => {
-    if (status === "loading") {
+    if (semesterScopedStatus === "loading") {
       return <DashboardLoadingState />;
     }
 
-    if (status === "error") {
+    if (semesterScopedStatus === "error") {
       return <DashboardErrorState error={error} onRetry={reload} />;
     }
 
-    if (status === "empty") {
+    if (semesterScopedStatus === "empty") {
       return (
         <DashboardEmptyState onOpenAddAssignment={handleOpenAddAssignment} />
       );
@@ -347,33 +454,54 @@ export function HomePage({
     return (
       <DashboardReadyState
         onOpenGrades={() => setActiveView("grades")}
-        viewModel={viewModel}
+        viewModel={filteredViewModel}
       />
     );
-  }, [error, handleOpenAddAssignment, reload, status, viewModel]);
+  }, [
+    error,
+    filteredViewModel,
+    handleOpenAddAssignment,
+    reload,
+    semesterScopedStatus,
+    viewModel,
+  ]);
 
   return (
     <>
       <main
         className={`app-scroll-shell min-h-screen selection:bg-[#CCFF00] selection:text-slate-900 ${
-          theme === "dark" ? "bg-slate-950 text-slate-50" : "bg-[#FAFAFA] text-slate-900"
+          theme === "dark"
+            ? "bg-slate-950 text-slate-50"
+            : "bg-[#FAFAFA] text-slate-900"
         }`}
       >
         <div
           className={`flex min-h-screen w-full flex-col lg:flex-row ${
-            theme === "dark" ? "app-theme-dark bg-slate-950 text-slate-50" : "app-theme-light bg-[#FAFAFA] text-slate-900"
+            theme === "dark"
+              ? "app-theme-dark bg-slate-950 text-slate-50"
+              : "app-theme-light bg-[#FAFAFA] text-slate-900"
           }`}
         >
           <Sidebar
             activeView={activeView}
             isSigningOut={isSigningOut}
+            highlightedTutorialAnchorKey={
+              isTutorialOpen
+                ? TUTORIAL_STEPS[tutorialStepIndex].anchorKey
+                : null
+            }
+            onOpenTutorial={handleOpenTutorial}
             onNavigate={setActiveView}
+            onSelectSemester={setSelectedSemesterId}
             onSignOut={onSignOut}
             onToggleTheme={() =>
               setTheme((currentTheme) =>
                 currentTheme === "light" ? "dark" : "light",
               )
             }
+            selectedSemesterId={activeSemesterOption.id}
+            selectedSemesterLabel={activeSemesterOption.label}
+            semesterOptions={semesterOptions}
             theme={theme}
           />
 
@@ -394,7 +522,7 @@ export function HomePage({
                   dashboardContent
                 ) : activeView === "assignments" ? (
                   <AssignmentsPage
-                    assignments={assignments}
+                    assignments={filteredAssignments}
                     error={error}
                     onOpenAddAssignment={handleOpenAddAssignment}
                     onReload={reload}
@@ -407,12 +535,12 @@ export function HomePage({
                   />
                 ) : (
                   <GradesPage
-                    assignments={assignments}
+                    assignments={filteredAssignments}
                     error={error}
                     onReload={reload}
                     onSaveAssignmentGrade={handleSaveAssignmentGrade}
-                    rawCourses={rawCourses}
-                    status={status}
+                    rawCourses={filteredCourses}
+                    status={semesterScopedStatus}
                   />
                 )}
               </div>
@@ -422,7 +550,8 @@ export function HomePage({
       </main>
 
       <AddAssignmentModal
-        courses={rawCourses.map((course) => ({
+        activeSemester={activeSemesterOption}
+        courses={filteredCourses.map((course) => ({
           color: course.color,
           id: course.id,
           name: course.name,
@@ -432,6 +561,17 @@ export function HomePage({
         onClose={handleCloseAddAssignment}
         onDataChanged={reload}
         userId={userId}
+      />
+
+      <TutorialCallout
+        anchorKey={TUTORIAL_STEPS[tutorialStepIndex].anchorKey}
+        currentStep={tutorialStepIndex}
+        description={TUTORIAL_STEPS[tutorialStepIndex].description}
+        isOpen={isTutorialOpen}
+        onClose={handleCloseTutorial}
+        onNext={handleAdvanceTutorial}
+        title={TUTORIAL_STEPS[tutorialStepIndex].title}
+        totalSteps={TUTORIAL_STEPS.length}
       />
     </>
   );

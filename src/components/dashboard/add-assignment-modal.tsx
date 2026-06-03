@@ -26,9 +26,14 @@ import {
   extractSyllabusCandidates,
   type SyllabusAssignmentCandidate,
 } from "@/components/dashboard/syllabus-parser";
+import {
+  getSemesterPrefillValue,
+  type SemesterOption,
+} from "@/components/dashboard/semester-utils";
 import { debugLog, debugTable } from "@/lib/debug-log";
 
 type AddAssignmentModalProps = {
+  activeSemester: SemesterOption;
   courses: DashboardCourseOption[];
   isOpen: boolean;
   onClose: () => void;
@@ -72,12 +77,15 @@ const INITIAL_MANUAL_FORM: ManualFormState = {
   title: "",
   weightPercent: "",
 };
-const INITIAL_COURSE_FORM: CourseFormState = {
-  color: "#CCFF00",
-  isTwoSemesterCourse: false,
-  name: "",
-  term: "",
-};
+
+function createInitialCourseForm(activeSemester: SemesterOption): CourseFormState {
+  return {
+    color: "#CCFF00",
+    isTwoSemesterCourse: false,
+    name: "",
+    term: getSemesterPrefillValue(activeSemester),
+  };
+}
 
 function isRlsPolicyError(error: unknown) {
   if (!error || typeof error !== "object" || !("message" in error)) {
@@ -192,6 +200,7 @@ function FieldLabel({
 }
 
 export function AddAssignmentModal({
+  activeSemester,
   courses,
   isOpen,
   onClose,
@@ -203,7 +212,7 @@ export function AddAssignmentModal({
     courses[0]?.id ?? NEW_COURSE_VALUE,
   );
   const [courseForm, setCourseForm] =
-    React.useState<CourseFormState>(INITIAL_COURSE_FORM);
+    React.useState<CourseFormState>(() => createInitialCourseForm(activeSemester));
   const [manualForm, setManualForm] =
     React.useState<ManualFormState>(INITIAL_MANUAL_FORM);
   const [syllabusFile, setSyllabusFile] = React.useState<File | null>(null);
@@ -225,7 +234,7 @@ export function AddAssignmentModal({
 
     setStep("chooser");
     setSelectedCourseId(courses[0]?.id ?? NEW_COURSE_VALUE);
-    setCourseForm(INITIAL_COURSE_FORM);
+    setCourseForm(createInitialCourseForm(activeSemester));
     setManualForm(INITIAL_MANUAL_FORM);
     setSyllabusFile(null);
     setReviewCandidates([]);
@@ -234,7 +243,21 @@ export function AddAssignmentModal({
     setSuccessMessage(null);
     setWarningMessage(null);
     setIsSubmitting(false);
-  }, [isOpen]);
+  }, [activeSemester, courses, isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen || selectedCourseId === NEW_COURSE_VALUE) {
+      return;
+    }
+
+    const hasSelectedCourse = courses.some((course) => course.id === selectedCourseId);
+
+    if (!hasSelectedCourse) {
+      setSelectedCourseId(courses[0]?.id ?? NEW_COURSE_VALUE);
+      setResolvedCourseId(null);
+      setErrorMessage(null);
+    }
+  }, [courses, isOpen, selectedCourseId]);
 
   const shouldCreateCourse =
     selectedCourseId === NEW_COURSE_VALUE || courses.length === 0;

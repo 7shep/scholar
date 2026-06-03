@@ -343,7 +343,7 @@ export function AssignmentsPage({
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AssignmentsSummaryCard
-          caption="this semester"
+          caption={semesterLabel}
           icon={<ListChecks className="h-5 w-5" />}
           label="Total"
           value={viewModel.totalCount}

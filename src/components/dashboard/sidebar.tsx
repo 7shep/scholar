@@ -1,24 +1,33 @@
 "use client";
 
+import * as React from "react";
 import {
   BarChart3,
+  Check,
   CheckSquare,
   ChevronDown,
   LayoutDashboard,
   LogOut,
   Moon,
+  Sparkles,
   Sun,
 } from "lucide-react";
 
 import { ScholarMark } from "@/components/brand/scholar-mark";
-import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
+import type { SemesterOption } from "@/components/dashboard/semester-utils";
 
 type SidebarProps = {
   activeView: "assignments" | "dashboard" | "grades";
   isSigningOut: boolean;
+  highlightedTutorialAnchorKey?: string | null;
+  onOpenTutorial: () => void;
   onNavigate: (view: "assignments" | "dashboard" | "grades") => void;
+  onSelectSemester: (semesterId: string) => void;
   onSignOut: () => Promise<void> | void;
   onToggleTheme: () => void;
+  selectedSemesterId: string;
+  selectedSemesterLabel: string;
+  semesterOptions: SemesterOption[];
   theme: "dark" | "light";
 };
 
@@ -28,16 +37,120 @@ const navigationItems = [
   { icon: BarChart3, label: "Grades", view: "grades" },
 ] as const;
 
+function SemesterSelector({
+  onSelectSemester,
+  selectedSemesterId,
+  selectedSemesterLabel,
+  semesterOptions,
+}: Pick<
+  SidebarProps,
+  "onSelectSemester" | "selectedSemesterId" | "selectedSemesterLabel" | "semesterOptions"
+>) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="relative min-w-0" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((currentValue) => !currentValue)}
+        className="inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+        aria-expanded={isOpen}
+        aria-haspopup="menu"
+      >
+        <span className="truncate">{selectedSemesterLabel}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-slate-500 transition ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {isOpen ? (
+        <div
+          className="absolute left-0 top-full z-20 mt-2 min-w-[15rem] rounded-2xl border border-slate-200 bg-white p-2 shadow-lg"
+          role="menu"
+        >
+          {semesterOptions.map((option) => {
+            const isSelected = option.id === selectedSemesterId;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  onSelectSemester(option.id);
+                  setIsOpen(false);
+                }}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition ${
+                  isSelected
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                }`}
+                role="menuitemradio"
+                aria-checked={isSelected}
+              >
+                <span className="truncate">{option.label}</span>
+                {isSelected ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Sidebar({
   activeView,
   isSigningOut,
+  highlightedTutorialAnchorKey,
+  onOpenTutorial,
   onNavigate,
+  onSelectSemester,
   onSignOut,
   onToggleTheme,
+  selectedSemesterId,
+  selectedSemesterLabel,
+  semesterOptions,
   theme,
 }: SidebarProps) {
-  const termLabel = getAcademicTermLabel();
   const ThemeIcon = theme === "light" ? Sun : Moon;
+  const semesterSelectorProps = {
+    onSelectSemester,
+    selectedSemesterId,
+    selectedSemesterLabel,
+    semesterOptions,
+  };
 
   return (
     <aside className="border-b border-slate-200 bg-white/95 backdrop-blur lg:h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r">
@@ -54,13 +167,7 @@ export function Sidebar({
             </div>
 
             <div className="hidden items-center gap-2 lg:mt-5 lg:inline-flex">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-              >
-                {termLabel}
-                <ChevronDown className="h-4 w-4 text-slate-500" />
-              </button>
+              <SemesterSelector {...semesterSelectorProps} />
               <button
                 type="button"
                 onClick={onToggleTheme}
@@ -73,13 +180,9 @@ export function Sidebar({
           </div>
 
           <div className="mt-6 flex items-center gap-2 lg:hidden">
-            <button
-              type="button"
-              className="inline-flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-            >
-              {termLabel}
-              <ChevronDown className="h-4 w-4 text-slate-500" />
-            </button>
+            <div className="min-w-0 flex-1">
+              <SemesterSelector {...semesterSelectorProps} />
+            </div>
             <button
               type="button"
               onClick={onToggleTheme}
@@ -91,37 +194,48 @@ export function Sidebar({
           </div>
 
           <nav className="mt-6 flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
-            {navigationItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => {
-                  if ("view" in item) {
-                    onNavigate(item.view);
-                  }
-                }}
-                className={`inline-flex min-w-fit items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  "view" in item && activeView === item.view
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
+            {navigationItems.map((item) => {
+              const anchorKey = `tutorial-${item.view}-nav`;
+              const isHighlighted = highlightedTutorialAnchorKey === anchorKey;
+
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  data-tutorial-anchor={anchorKey}
+                  onClick={() => {
+                    if ("view" in item) {
+                      onNavigate(item.view);
+                    }
+                  }}
+                  className={`inline-flex min-w-fit items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                    isHighlighted
+                      ? "relative z-50 ring-4 ring-[#CCFF00] ring-offset-2 ring-offset-white shadow-[0_0_0_1px_rgba(15,23,42,0.18)]"
+                      : ""
+                  } ${
+                    "view" in item && activeView === item.view
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
         <div className="mt-auto border-t border-slate-100 p-4 sm:p-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            {/* <button
+            <button
               type="button"
+              onClick={onOpenTutorial}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
             >
-              <Settings className="h-4 w-4" />
-              Settings
-            </button> */}
+              <Sparkles className="h-4 w-4" />
+              Tutorial
+            </button>
 
             <button
               type="button"
