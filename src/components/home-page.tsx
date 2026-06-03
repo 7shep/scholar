@@ -19,6 +19,7 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { UpNextPanel } from "@/components/dashboard/up-next-panel";
+import { TutorialCallout } from "@/components/dashboard/tutorial-callout";
 
 type HomePageProps = {
   email?: string;
@@ -30,6 +31,42 @@ type HomePageProps = {
 
 type AppView = "assignments" | "dashboard" | "grades";
 type AppTheme = "dark" | "light";
+type TutorialAnchorKey = "tutorial-assignments-nav" | "tutorial-dashboard-nav" | "tutorial-grades-nav";
+type TutorialStep = {
+  anchorKey: TutorialAnchorKey;
+  description: string;
+  title: string;
+  view: AppView;
+};
+
+const TUTORIAL_DISMISSED_PREFIX = "scholar-tutorial-dismissed";
+const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    anchorKey: "tutorial-dashboard-nav",
+    description:
+      "This is your home base. Open Dashboard to check your current GPA, upcoming work, and the items that need attention first.",
+    title: "Dashboard",
+    view: "dashboard",
+  },
+  {
+    anchorKey: "tutorial-assignments-nav",
+    description:
+      "Use Assignments to keep track of open work, mark items complete, and stay on top of overdue deadlines.",
+    title: "Assignments",
+    view: "assignments",
+  },
+  {
+    anchorKey: "tutorial-grades-nav",
+    description:
+      "Use Grades to enter scores, review course summaries, and see how each grade affects your academic progress.",
+    title: "Grades",
+    view: "grades",
+  },
+];
+
+function getTutorialStorageKey(userId: string) {
+  return `${TUTORIAL_DISMISSED_PREFIX}:${userId}`;
+}
 
 function DashboardLoadingState() {
   return (
@@ -181,6 +218,10 @@ export function HomePage({
   userId,
 }: HomePageProps) {
   const displayName = getDisplayName(fullName, email);
+  const tutorialStorageKey = React.useMemo(
+    () => getTutorialStorageKey(userId),
+    [userId],
+  );
   const {
     assignments,
     error,
@@ -192,6 +233,8 @@ export function HomePage({
   const [activeView, setActiveView] = React.useState<AppView>("dashboard");
   const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = React.useState(false);
+  const [tutorialStepIndex, setTutorialStepIndex] = React.useState(0);
 
   React.useEffect(() => {
     if (typeof window === "undefined") {
@@ -213,6 +256,29 @@ export function HomePage({
     window.localStorage.setItem("scholar-theme", theme);
   }, [theme]);
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const dismissed = window.localStorage.getItem(tutorialStorageKey) === "true";
+
+    setIsTutorialOpen(false);
+
+    if (!dismissed) {
+      setTutorialStepIndex(0);
+      setIsTutorialOpen(true);
+    }
+  }, [tutorialStorageKey]);
+
+  React.useEffect(() => {
+    if (!isTutorialOpen) {
+      return;
+    }
+
+    setActiveView(TUTORIAL_STEPS[tutorialStepIndex].view);
+  }, [isTutorialOpen, tutorialStepIndex]);
+
   const handleOpenAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(true);
   }, []);
@@ -220,6 +286,30 @@ export function HomePage({
   const handleCloseAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(false);
   }, []);
+
+  const handleOpenTutorial = React.useCallback(() => {
+    setTutorialStepIndex(0);
+    setIsTutorialOpen(true);
+  }, []);
+
+  const handleCloseTutorial = React.useCallback(() => {
+    setIsTutorialOpen(false);
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem(tutorialStorageKey, "true");
+  }, [tutorialStorageKey]);
+
+  const handleAdvanceTutorial = React.useCallback(() => {
+    if (tutorialStepIndex >= TUTORIAL_STEPS.length - 1) {
+      handleCloseTutorial();
+      return;
+    }
+
+    setTutorialStepIndex((currentStep) => currentStep + 1);
+  }, [handleCloseTutorial, tutorialStepIndex]);
 
   const handleToggleAssignmentStatus = React.useCallback(
     async (assignmentId: string, isCompleted: boolean) => {
@@ -284,9 +374,15 @@ export function HomePage({
             theme === "dark" ? "app-theme-dark bg-slate-950 text-slate-50" : "app-theme-light bg-[#FAFAFA] text-slate-900"
           }`}
         >
-          <Sidebar
+            <Sidebar
             activeView={activeView}
             isSigningOut={isSigningOut}
+            highlightedTutorialAnchorKey={
+              isTutorialOpen
+                ? TUTORIAL_STEPS[tutorialStepIndex].anchorKey
+                : null
+            }
+            onOpenTutorial={handleOpenTutorial}
             onNavigate={setActiveView}
             onSignOut={onSignOut}
             onToggleTheme={() =>
@@ -346,6 +442,17 @@ export function HomePage({
         onClose={handleCloseAddAssignment}
         onDataChanged={reload}
         userId={userId}
+      />
+
+      <TutorialCallout
+        anchorKey={TUTORIAL_STEPS[tutorialStepIndex].anchorKey}
+        currentStep={tutorialStepIndex}
+        description={TUTORIAL_STEPS[tutorialStepIndex].description}
+        isOpen={isTutorialOpen}
+        onClose={handleCloseTutorial}
+        onNext={handleAdvanceTutorial}
+        title={TUTORIAL_STEPS[tutorialStepIndex].title}
+        totalSteps={TUTORIAL_STEPS.length}
       />
     </>
   );

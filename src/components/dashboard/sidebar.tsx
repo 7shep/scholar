@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Moon,
+  Sparkles,
   Sun,
 } from "lucide-react";
 
@@ -16,6 +17,8 @@ import { getAcademicTermLabel } from "@/components/dashboard/dashboard-utils";
 type SidebarProps = {
   activeView: "assignments" | "dashboard" | "grades";
   isSigningOut: boolean;
+  highlightedTutorialAnchorKey?: string | null;
+  onOpenTutorial: () => void;
   onNavigate: (view: "assignments" | "dashboard" | "grades") => void;
   onSignOut: () => Promise<void> | void;
   onToggleTheme: () => void;
@@ -31,6 +34,8 @@ const navigationItems = [
 export function Sidebar({
   activeView,
   isSigningOut,
+  highlightedTutorialAnchorKey,
+  onOpenTutorial,
   onNavigate,
   onSignOut,
   onToggleTheme,
@@ -91,37 +96,48 @@ export function Sidebar({
           </div>
 
           <nav className="mt-6 flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
-            {navigationItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => {
-                  if ("view" in item) {
-                    onNavigate(item.view);
-                  }
-                }}
-                className={`inline-flex min-w-fit items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  "view" in item && activeView === item.view
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.label}
-              </button>
-            ))}
+            {navigationItems.map((item) => {
+              const anchorKey = `tutorial-${item.view}-nav`;
+              const isHighlighted = highlightedTutorialAnchorKey === anchorKey;
+
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  data-tutorial-anchor={anchorKey}
+                  onClick={() => {
+                    if ("view" in item) {
+                      onNavigate(item.view);
+                    }
+                  }}
+                  className={`inline-flex min-w-fit items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                    isHighlighted
+                      ? "relative z-50 ring-4 ring-[#CCFF00] ring-offset-2 ring-offset-white shadow-[0_0_0_1px_rgba(15,23,42,0.18)]"
+                      : ""
+                  } ${
+                    "view" in item && activeView === item.view
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
         <div className="mt-auto border-t border-slate-100 p-4 sm:p-6">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-            {/* <button
+            <button
               type="button"
+              onClick={onOpenTutorial}
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
             >
-              <Settings className="h-4 w-4" />
-              Settings
-            </button> */}
+              <Sparkles className="h-4 w-4" />
+              Tutorial
+            </button>
 
             <button
               type="button"
