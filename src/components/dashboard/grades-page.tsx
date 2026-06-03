@@ -373,6 +373,15 @@ export function GradesPage({
     [activeFilter, assignments, deferredSearchQuery, rawCourses, selectedCourseId],
   );
 
+  React.useEffect(() => {
+    if (
+      selectedCourseId !== "all" &&
+      !rawCourses.some((course) => course.id === selectedCourseId)
+    ) {
+      setSelectedCourseId("all");
+    }
+  }, [rawCourses, selectedCourseId]);
+
   const renderHeader = () => (
     <div>
       <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">

@@ -33,6 +33,7 @@ type AssignmentsPageProps = {
     isCompleted: boolean,
   ) => Promise<void>;
   rawCourses: CourseRow[];
+  semesterLabel: string;
   status: DashboardStatus;
 };
 
@@ -191,6 +192,7 @@ export function AssignmentsPage({
   onReload,
   onToggleAssignmentStatus,
   rawCourses,
+  semesterLabel,
   status,
 }: AssignmentsPageProps) {
   const [activeFilter, setActiveFilter] =
@@ -232,6 +234,15 @@ export function AssignmentsPage({
     status,
     viewModel,
   ]);
+
+  React.useEffect(() => {
+    if (
+      selectedCourseId !== "all" &&
+      !rawCourses.some((course) => course.id === selectedCourseId)
+    ) {
+      setSelectedCourseId("all");
+    }
+  }, [rawCourses, selectedCourseId]);
 
   const handleToggleStatus = React.useCallback(
     async (assignmentId: string, isCompleted: boolean) => {
@@ -302,7 +313,7 @@ export function AssignmentsPage({
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <AssignmentsSummaryCard
-          caption="this semester"
+          caption={semesterLabel}
           icon={<ListChecks className="h-5 w-5" />}
           label="Total"
           value={viewModel.totalCount}
