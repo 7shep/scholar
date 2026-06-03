@@ -56,5 +56,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and publish macOS release
+      - name: Build and publish signed macOS release
+        if: ${{ env.CSC_LINK != '' && env.CSC_KEY_PASSWORD != '' && env.APPLE_ID != '' && env.APPLE_APP_SPECIFIC_PASSWORD != '' && env.APPLE_TEAM_ID != '' }}
         run: npm run release:mac
+
+      - name: Build and publish unsigned macOS release
+        if: ${{ env.CSC_LINK == '' || env.CSC_KEY_PASSWORD == '' || env.APPLE_ID == '' || env.APPLE_APP_SPECIFIC_PASSWORD == '' || env.APPLE_TEAM_ID == '' }}
+        run: npm run release:mac:unsigned
