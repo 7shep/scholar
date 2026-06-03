@@ -25,6 +25,7 @@ const ALL_SEMESTERS_OPTION: SemesterOption = {
   label: "All semesters",
   normalizedTerm: null,
 };
+const SEMESTER_SELECTION_STORAGE_KEY_PREFIX = "scholar-selected-semester";
 
 function getTimestampValue(value: string | null | undefined) {
   if (!value) {
@@ -222,4 +223,6 @@ export function getSemesterPrefillValue(option: SemesterOption) {
   return option.kind === "term" ? option.label : "";
 }
 
-export const SEMESTER_SELECTION_STORAGE_KEY = "scholar-selected-semester";
+export function getSemesterSelectionStorageKey(userId: string) {
+  return `${SEMESTER_SELECTION_STORAGE_KEY_PREFIX}:${userId}`;
+}

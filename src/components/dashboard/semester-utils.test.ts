@@ -10,6 +10,7 @@ import {
   filterCoursesBySemester,
   getSemesterOptionById,
   getSemesterPrefillValue,
+  getSemesterSelectionStorageKey,
   normalizeSemesterTerm,
   resolveSelectedSemesterId,
 } from "@/components/dashboard/semester-utils";
@@ -299,5 +300,16 @@ describe("getSemesterPrefillValue", () => {
   it("returns an empty string for the all-semesters option", () => {
     const [allOption] = buildSemesterOptions([]);
     expect(getSemesterPrefillValue(allOption)).toBe("");
+  });
+});
+
+describe("getSemesterSelectionStorageKey", () => {
+  it("namespaces the selection key by user id", () => {
+    expect(getSemesterSelectionStorageKey("user-a")).toBe(
+      "scholar-selected-semester:user-a",
+    );
+    expect(getSemesterSelectionStorageKey("user-b")).toBe(
+      "scholar-selected-semester:user-b",
+    );
   });
 });

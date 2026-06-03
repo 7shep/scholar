@@ -24,7 +24,7 @@ import {
   filterAssignmentsBySemester,
   filterCoursesBySemester,
   getSemesterOptionById,
-  SEMESTER_SELECTION_STORAGE_KEY,
+  getSemesterSelectionStorageKey,
   resolveSelectedSemesterId,
 } from "@/components/dashboard/semester-utils";
 import { Sidebar } from "@/components/dashboard/sidebar";
@@ -206,17 +206,35 @@ export function HomePage({
     viewModel,
   } = useDashboardData(userId);
   const [activeView, setActiveView] = React.useState<AppView>("dashboard");
-  const [selectedSemesterId, setSelectedSemesterId] =
-    React.useState<string | null>(null);
   const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
+  const semesterSelectionStorageKey = React.useMemo(
+    () => getSemesterSelectionStorageKey(userId),
+    [userId],
+  );
+  const [selectedSemesterId, setSelectedSemesterId] = React.useState<
+    string | null
+  >(() => safeLocalStorageGet(semesterSelectionStorageKey));
   const semesterOptions = React.useMemo(
     () => buildSemesterOptions(rawCourses),
     [rawCourses],
   );
+  const storedSemesterSelectionId = safeLocalStorageGet(
+    semesterSelectionStorageKey,
+  );
+  const resolvedSemesterId = React.useMemo(
+    () =>
+      resolveSelectedSemesterId({
+        currentAcademicTermLabel: getAcademicTermLabel(),
+        currentSelectionId: selectedSemesterId,
+        options: semesterOptions,
+        savedSelectionId: storedSemesterSelectionId,
+      }),
+    [semesterOptions, selectedSemesterId, storedSemesterSelectionId],
+  );
   const activeSemesterOption = React.useMemo(
-    () => getSemesterOptionById(semesterOptions, selectedSemesterId),
-    [semesterOptions, selectedSemesterId],
+    () => getSemesterOptionById(semesterOptions, resolvedSemesterId),
+    [resolvedSemesterId, semesterOptions],
   );
   const filteredCourses = React.useMemo(
     () => filterCoursesBySemester(rawCourses, activeSemesterOption),
@@ -261,26 +279,16 @@ export function HomePage({
   }, [theme]);
 
   React.useEffect(() => {
-    const savedSelectionId = safeLocalStorageGet(SEMESTER_SELECTION_STORAGE_KEY);
-    const nextSelectionId = resolveSelectedSemesterId({
-      currentAcademicTermLabel: getAcademicTermLabel(),
-      currentSelectionId: selectedSemesterId,
-      options: semesterOptions,
-      savedSelectionId,
-    });
-
-    if (nextSelectionId !== selectedSemesterId) {
-      setSelectedSemesterId(nextSelectionId);
-    }
-  }, [selectedSemesterId, semesterOptions]);
-
-  React.useEffect(() => {
-    if (selectedSemesterId == null) {
+    if (status === "loading") {
       return;
     }
 
-    safeLocalStorageSet(SEMESTER_SELECTION_STORAGE_KEY, selectedSemesterId);
-  }, [selectedSemesterId]);
+    if (resolvedSemesterId == null) {
+      return;
+    }
+
+    safeLocalStorageSet(semesterSelectionStorageKey, resolvedSemesterId);
+  }, [resolvedSemesterId, semesterSelectionStorageKey, status]);
 
   const handleOpenAddAssignment = React.useCallback(() => {
     setIsAddAssignmentOpen(true);
