@@ -369,7 +369,7 @@ export function GradesPage({
         courseId: selectedCourseId,
         query: deferredSearchQuery,
         status: activeFilter,
-      }),
+    }),
     [activeFilter, assignments, deferredSearchQuery, rawCourses, selectedCourseId],
   );
 
