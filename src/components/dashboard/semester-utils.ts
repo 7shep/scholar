@@ -49,11 +49,38 @@ export function buildSemesterOptionId(normalizedTerm: string) {
   return `term:${normalizedTerm}`;
 }
 
+type SemesterTermAccumulator = {
+  label: string;
+  recencyCreatedAt: number | null;
+  recencyIndex: number;
+};
+
+// Orders two courses from newest to oldest. A missing `created_at` is treated
+// as the oldest possible value, and the source array index (courses load in
+// ascending creation order) is only used to break exact ties.
+function compareRecencyDescending(
+  leftCreatedAt: number | null,
+  leftIndex: number,
+  rightCreatedAt: number | null,
+  rightIndex: number,
+) {
+  if (leftCreatedAt !== rightCreatedAt) {
+    if (leftCreatedAt == null) {
+      return 1;
+    }
+
+    if (rightCreatedAt == null) {
+      return -1;
+    }
+
+    return rightCreatedAt - leftCreatedAt;
+  }
+
+  return rightIndex - leftIndex;
+}
+
 export function buildSemesterOptions(courses: CourseRow[]): SemesterOption[] {
-  const optionsByTerm = new Map<
-    string,
-    { label: string; lastCreatedAt: number; lastSeenIndex: number }
-  >();
+  const optionsByTerm = new Map<string, SemesterTermAccumulator>();
 
   courses.forEach((course, index) => {
     const normalizedTerm = normalizeSemesterTerm(course.term);
@@ -63,34 +90,42 @@ export function buildSemesterOptions(courses: CourseRow[]): SemesterOption[] {
     }
 
     const trimmedLabel = course.term?.trim() ?? "";
-    const createdAt = getTimestampValue(course.created_at) ?? index;
-    const currentOption = optionsByTerm.get(normalizedTerm);
+    const createdAt = getTimestampValue(course.created_at);
+    const existingOption = optionsByTerm.get(normalizedTerm);
 
-    if (
-      !currentOption ||
-      createdAt > currentOption.lastCreatedAt ||
-      (createdAt === currentOption.lastCreatedAt &&
-        index > currentOption.lastSeenIndex)
-    ) {
+    if (!existingOption) {
       optionsByTerm.set(normalizedTerm, {
         label: trimmedLabel,
-        lastCreatedAt: createdAt,
-        lastSeenIndex: index,
+        recencyCreatedAt: createdAt,
+        recencyIndex: index,
       });
+      return;
+    }
+
+    // Keep the first meaningful label for the term, but advance the recency
+    // markers so the option still sorts by its most recently created course.
+    if (
+      compareRecencyDescending(
+        createdAt,
+        index,
+        existingOption.recencyCreatedAt,
+        existingOption.recencyIndex,
+      ) < 0
+    ) {
+      existingOption.recencyCreatedAt = createdAt;
+      existingOption.recencyIndex = index;
     }
   });
 
   const termOptions = Array.from(optionsByTerm.entries())
-    .sort((left, right) => {
-      const [, leftValue] = left;
-      const [, rightValue] = right;
-
-      if (leftValue.lastCreatedAt !== rightValue.lastCreatedAt) {
-        return rightValue.lastCreatedAt - leftValue.lastCreatedAt;
-      }
-
-      return rightValue.lastSeenIndex - leftValue.lastSeenIndex;
-    })
+    .sort(([, leftValue], [, rightValue]) =>
+      compareRecencyDescending(
+        leftValue.recencyCreatedAt,
+        leftValue.recencyIndex,
+        rightValue.recencyCreatedAt,
+        rightValue.recencyIndex,
+      ),
+    )
     .map(([normalizedTerm, value]) => ({
       id: buildSemesterOptionId(normalizedTerm),
       kind: "term" as const,

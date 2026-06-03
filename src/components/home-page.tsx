@@ -31,6 +31,10 @@ import { Sidebar } from "@/components/dashboard/sidebar";
 import { StatsRow } from "@/components/dashboard/stats-row";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { UpNextPanel } from "@/components/dashboard/up-next-panel";
+import {
+  safeLocalStorageGet,
+  safeLocalStorageSet,
+} from "@/lib/safe-storage";
 
 type HomePageProps = {
   email?: string;
@@ -245,11 +249,7 @@ export function HomePage({
   }, [filteredCourses.length, filteredViewModel.stats, status]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const savedTheme = window.localStorage.getItem("scholar-theme");
+    const savedTheme = safeLocalStorageGet("scholar-theme");
 
     if (savedTheme === "light" || savedTheme === "dark") {
       setTheme(savedTheme);
@@ -257,21 +257,11 @@ export function HomePage({
   }, []);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem("scholar-theme", theme);
+    safeLocalStorageSet("scholar-theme", theme);
   }, [theme]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const savedSelectionId = window.localStorage.getItem(
-      SEMESTER_SELECTION_STORAGE_KEY,
-    );
+    const savedSelectionId = safeLocalStorageGet(SEMESTER_SELECTION_STORAGE_KEY);
     const nextSelectionId = resolveSelectedSemesterId({
       currentAcademicTermLabel: getAcademicTermLabel(),
       currentSelectionId: selectedSemesterId,
@@ -285,14 +275,11 @@ export function HomePage({
   }, [selectedSemesterId, semesterOptions]);
 
   React.useEffect(() => {
-    if (typeof window === "undefined" || selectedSemesterId == null) {
+    if (selectedSemesterId == null) {
       return;
     }
 
-    window.localStorage.setItem(
-      SEMESTER_SELECTION_STORAGE_KEY,
-      selectedSemesterId,
-    );
+    safeLocalStorageSet(SEMESTER_SELECTION_STORAGE_KEY, selectedSemesterId);
   }, [selectedSemesterId]);
 
   const handleOpenAddAssignment = React.useCallback(() => {

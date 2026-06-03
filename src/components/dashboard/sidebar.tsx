@@ -140,6 +140,12 @@ export function Sidebar({
   theme,
 }: SidebarProps) {
   const ThemeIcon = theme === "light" ? Sun : Moon;
+  const semesterSelectorProps = {
+    onSelectSemester,
+    selectedSemesterId,
+    selectedSemesterLabel,
+    semesterOptions,
+  };
 
   return (
     <aside className="border-b border-slate-200 bg-white/95 backdrop-blur lg:h-screen lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r">
@@ -156,12 +162,7 @@ export function Sidebar({
             </div>
 
             <div className="hidden items-center gap-2 lg:mt-5 lg:inline-flex">
-              <SemesterSelector
-                onSelectSemester={onSelectSemester}
-                selectedSemesterId={selectedSemesterId}
-                selectedSemesterLabel={selectedSemesterLabel}
-                semesterOptions={semesterOptions}
-              />
+              <SemesterSelector {...semesterSelectorProps} />
               <button
                 type="button"
                 onClick={onToggleTheme}
@@ -175,12 +176,7 @@ export function Sidebar({
 
           <div className="mt-6 flex items-center gap-2 lg:hidden">
             <div className="min-w-0 flex-1">
-              <SemesterSelector
-                onSelectSemester={onSelectSemester}
-                selectedSemesterId={selectedSemesterId}
-                selectedSemesterLabel={selectedSemesterLabel}
-                semesterOptions={semesterOptions}
-              />
+              <SemesterSelector {...semesterSelectorProps} />
             </div>
             <button
               type="button"
