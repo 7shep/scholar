@@ -47,44 +47,31 @@ type HomePageProps = {
 
 type AppView = "assignments" | "dashboard" | "grades";
 type AppTheme = "dark" | "light";
-type TutorialAnchorKey =
-  | "tutorial-assignments-nav"
-  | "tutorial-dashboard-nav"
-  | "tutorial-grades-nav";
-type TutorialStep = {
-  anchorKey: TutorialAnchorKey;
-  description: string;
-  title: string;
-  view: AppView;
+type AssignmentSearchFocusRequest = {
+  selectText: boolean;
+  token: number;
 };
 
-const TUTORIAL_DISMISSED_PREFIX = "scholar-tutorial-dismissed";
-const TUTORIAL_STEPS: TutorialStep[] = [
-  {
-    anchorKey: "tutorial-dashboard-nav",
-    description:
-      "This is your home base. Open Dashboard to check your current GPA, upcoming work, and the items that need attention first.",
-    title: "Dashboard",
-    view: "dashboard",
-  },
-  {
-    anchorKey: "tutorial-assignments-nav",
-    description:
-      "Use Assignments to keep track of open work, mark items complete, and stay on top of overdue deadlines.",
-    title: "Assignments",
-    view: "assignments",
-  },
-  {
-    anchorKey: "tutorial-grades-nav",
-    description:
-      "Use Grades to enter scores, review course summaries, and see how each grade affects your academic progress.",
-    title: "Grades",
-    view: "grades",
-  },
-];
+function isEditableElement(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
 
-function getTutorialStorageKey(userId: string) {
-  return `${TUTORIAL_DISMISSED_PREFIX}:${userId}`;
+  const tagName = target.tagName.toLowerCase();
+
+  return (
+    tagName === "input" ||
+    tagName === "select" ||
+    tagName === "textarea" ||
+    target.isContentEditable
+  );
+}
+
+function isAssignmentSearchElement(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    target.dataset.assignmentSearchInput === "true"
+  );
 }
 
 function DashboardLoadingState() {
@@ -254,6 +241,12 @@ export function HomePage({
     viewModel,
   } = useDashboardData(userId);
   const [activeView, setActiveView] = React.useState<AppView>("dashboard");
+  const [assignmentSearchFocusRequest, setAssignmentSearchFocusRequest] =
+    React.useState<AssignmentSearchFocusRequest>({
+      selectText: false,
+      token: 0,
+    });
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = React.useState("");
   const [theme, setTheme] = React.useState<AppTheme>("light");
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = React.useState(false);
   const semesterSelectionStorageKey = React.useMemo(
@@ -367,24 +360,53 @@ export function HomePage({
     setIsAddAssignmentOpen(false);
   }, []);
 
-  const handleOpenTutorial = React.useCallback(() => {
-    setTutorialStepIndex(0);
-    setIsTutorialOpen(true);
-  }, []);
+  const activateAssignmentSearch = React.useCallback(
+    (options?: { query?: string; selectText?: boolean }) => {
+      if (typeof options?.query === "string") {
+        setAssignmentSearchQuery(options.query);
+      }
 
-  const handleCloseTutorial = React.useCallback(() => {
-    setIsTutorialOpen(false);
-    safeLocalStorageSet(tutorialStorageKey, "true");
-  }, [tutorialStorageKey]);
+      setActiveView("assignments");
+      setAssignmentSearchFocusRequest((currentRequest) => ({
+        selectText: options?.selectText ?? false,
+        token: currentRequest.token + 1,
+      }));
+    },
+    [],
+  );
 
-  const handleAdvanceTutorial = React.useCallback(() => {
-    if (tutorialStepIndex >= TUTORIAL_STEPS.length - 1) {
-      handleCloseTutorial();
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
       return;
     }
 
-    setTutorialStepIndex((currentStep) => currentStep + 1);
-  }, [handleCloseTutorial, tutorialStepIndex]);
+    const handleKeydown = (event: KeyboardEvent) => {
+      const isSearchShortcut =
+        event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey);
+
+      if (!isSearchShortcut) {
+        return;
+      }
+
+      if (
+        isEditableElement(event.target) &&
+        !isAssignmentSearchElement(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      activateAssignmentSearch({
+        selectText: activeView === "assignments",
+      });
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeydown);
+    };
+  }, [activateAssignmentSearch, activeView]);
 
   const handleToggleAssignmentStatus = React.useCallback(
     async (assignmentId: string, isCompleted: boolean) => {
@@ -487,7 +509,10 @@ export function HomePage({
             {activeView === "dashboard" ? (
               <TopBar
                 displayName={displayName}
+                onActivateSearch={activateAssignmentSearch}
                 onQuickAdd={handleOpenAddAssignment}
+                onSearchQueryChange={setAssignmentSearchQuery}
+                searchQuery={assignmentSearchQuery}
               />
             ) : null}
 
@@ -501,10 +526,12 @@ export function HomePage({
                     error={error}
                     onOpenAddAssignment={handleOpenAddAssignment}
                     onReload={reload}
+                    onSearchQueryChange={setAssignmentSearchQuery}
                     onToggleAssignmentStatus={handleToggleAssignmentStatus}
-                    rawCourses={filteredCourses}
-                    semesterLabel={activeSemesterOption.label}
-                    status={semesterScopedStatus}
+                    rawCourses={rawCourses}
+                    searchFocusRequest={assignmentSearchFocusRequest}
+                    searchQuery={assignmentSearchQuery}
+                    status={status}
                   />
                 ) : (
                   <GradesPage

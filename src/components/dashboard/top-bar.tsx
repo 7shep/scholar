@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { Search } from "lucide-react";
 
 import {
@@ -11,9 +12,41 @@ import {
 type TopBarProps = {
   displayName: string;
   onQuickAdd?: () => void;
+  onActivateSearch?: (options?: {
+    query?: string;
+    selectText?: boolean;
+  }) => void;
+  onSearchQueryChange?: (query: string) => void;
+  searchQuery?: string;
 };
 
-export function TopBar({ displayName, onQuickAdd }: TopBarProps) {
+function isPlainTextEntryKey(event: KeyboardEvent<HTMLInputElement>) {
+  return (
+    event.key.length === 1 &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey
+  );
+}
+
+function getNextSearchValue(
+  input: HTMLInputElement,
+  nextText: string,
+  fallbackValue: string,
+) {
+  const selectionStart = input.selectionStart ?? fallbackValue.length;
+  const selectionEnd = input.selectionEnd ?? fallbackValue.length;
+
+  return `${fallbackValue.slice(0, selectionStart)}${nextText}${fallbackValue.slice(selectionEnd)}`;
+}
+
+export function TopBar({
+  displayName,
+  onActivateSearch,
+  onQuickAdd,
+  onSearchQueryChange,
+  searchQuery = "",
+}: TopBarProps) {
   const today = new Date();
   const firstName = getFirstName(displayName);
   const greeting = getGreeting(today);
@@ -46,6 +79,33 @@ export function TopBar({ displayName, onQuickAdd }: TopBarProps) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange?.(event.target.value)}
+              onFocus={() => onActivateSearch?.({ selectText: false })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onActivateSearch?.({ selectText: false });
+                  return;
+                }
+
+                if (!isPlainTextEntryKey(event)) {
+                  return;
+                }
+
+                const nextQuery = getNextSearchValue(
+                  event.currentTarget,
+                  event.key,
+                  searchQuery,
+                );
+
+                event.preventDefault();
+                onSearchQueryChange?.(nextQuery);
+                onActivateSearch?.({
+                  query: nextQuery,
+                  selectText: false,
+                });
+              }}
               placeholder="Search assignments..."
               className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-16 text-sm text-slate-900 outline-none transition focus:border-lime-300 focus:ring-2 focus:ring-lime-200"
             />
